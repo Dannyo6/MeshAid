@@ -1,0 +1,26 @@
+{
+  "name": "meshaid-monorepo",
+  "version": "0.1.0",
+  "private": true,
+  "description": "MeshAid: Offline Emergency Communication & Relay Network",
+  "workspaces": [
+    "packages/*",
+    "services/*",
+    "apps/*"
+  ],
+  "scripts": {
+    "test": "npm run test --workspace=packages/protocol",
+    "build": "npm run build --workspace=packages/protocol",
+    "lint": "npm run lint --workspace=packages/protocol"
+  },
+  "keywords": [
+    "emergency-communication",
+    "delay-tolerant-networking",
+    "opportunistic-mesh",
+    "store-carry-forward",
+    "ble",
+    "distributed-systems"
+  ],
+  "author": "ADROIT Technical Club",
+  "license": "MIT"
+}

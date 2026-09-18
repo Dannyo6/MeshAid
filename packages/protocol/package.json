@@ -1,0 +1,27 @@
+{
+  "name": "@meshaid/protocol",
+  "version": "0.1.0",
+  "description": "Core protocol models, serialization, and DTN store-carry-forward relay engine for MeshAid",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "type": "module",
+  "scripts": {
+    "build": "tsc",
+    "test": "node --experimental-strip-types --test tests/relay.test.ts",
+    "lint": "tsc --noEmit"
+  },
+  "keywords": [
+    "meshaid",
+    "dtn",
+    "delay-tolerant-networking",
+    "opportunistic-mesh",
+    "store-carry-forward",
+    "protocol"
+  ],
+  "author": "ADROIT Technical Club",
+  "license": "MIT",
+  "devDependencies": {
+    "@types/node": "^22.10.1",
+    "typescript": "^5.7.2"
+  }
+}
