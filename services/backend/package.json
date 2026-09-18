@@ -9,7 +9,7 @@
     "build": "tsc"
   },
   "dependencies": {
-    "@meshaid/protocol": "workspace:*"
+    "@meshaid/protocol": "*"
   },
   "devDependencies": {
     "@types/node": "^22.10.1",
