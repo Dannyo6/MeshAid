@@ -1,7 +1,6 @@
 package dev.meshaid.app.data.local.dao
 
 import dev.meshaid.app.data.local.entity.MeshAidMessageEntity
-import dev.meshaid.app.data.local.entity.MeshAidMessageEntity.RelayStatus
 import dev.meshaid.app.data.local.entity.SeenPacketEntity
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.first
@@ -48,17 +47,20 @@ class MeshAidDaoTest {
         id: String,
         priority: Int = 1,
         ttlOffset: Long = 300L,          // seconds from now (positive = future)
-        status: String = RelayStatus.PENDING,
+        isRelayed: Boolean = false,
         createdAtOffset: Long = 0L       // millis offset from now (negative = older)
     ): MeshAidMessageEntity {
         val now = System.currentTimeMillis()
         return MeshAidMessageEntity(
             messageId = id,
-            wireBytes = id.toByteArray(),
             priority = priority,
-            ttl = nowSeconds() + ttlOffset,
+            hopCount = 0,
             createdAt = now + createdAtOffset,
-            relayStatus = status
+            ttl = nowSeconds() + ttlOffset,
+            latitude = 0f,
+            longitude = 0f,
+            rawPacket = id.toByteArray(),
+            isRelayed = isRelayed
         )
     }
 
@@ -113,9 +115,9 @@ class MeshAidDaoTest {
     }
 
     @Test
-    fun `getPendingQueue excludes RELAYED packets`() = runTest {
-        dao.insertMessage(message("pending", status = RelayStatus.PENDING))
-        dao.insertMessage(message("relayed", status = RelayStatus.RELAYED))
+    fun `getPendingQueue excludes relayed packets`() = runTest {
+        dao.insertMessage(message("pending", isRelayed = false))
+        dao.insertMessage(message("relayed", isRelayed = true))
 
         val queue = dao.getPendingQueue(nowSeconds())
 
@@ -155,8 +157,8 @@ class MeshAidDaoTest {
         val oldTimestamp = System.currentTimeMillis() - 20 * 60 * 1000L // 20 min ago
         val freshTimestamp = System.currentTimeMillis() - 2 * 60 * 1000L  // 2 min ago
 
-        dao.insertSeen(SeenPacketEntity("old-msg",   firstSeenTimestamp = oldTimestamp))
-        dao.insertSeen(SeenPacketEntity("fresh-msg", firstSeenTimestamp = freshTimestamp))
+        dao.insertSeen(SeenPacketEntity("old-msg",   firstSeenAt = oldTimestamp))
+        dao.insertSeen(SeenPacketEntity("fresh-msg", firstSeenAt = freshTimestamp))
 
         val cutoff = System.currentTimeMillis() - SeenPacketEntity.SEEN_TTL_MS
         val pruned = dao.pruneOldSeenPackets(cutoff)
@@ -212,12 +214,12 @@ class MeshAidDaoTest {
     // ─── Status Update ────────────────────────────────────────────────────────
 
     @Test
-    fun `updateRelayStatus marks packet as RELAYED`() = runTest {
+    fun `updateRelayStatus marks packet as relayed`() = runTest {
         dao.insertMessage(message("relay-me"))
 
-        dao.updateRelayStatus("relay-me", RelayStatus.RELAYED)
+        dao.updateRelayStatus("relay-me", isRelayed = true)
 
-        // The queue should no longer contain it (RELAYED rows are excluded)
+        // The queue should no longer contain it (relayed rows are excluded)
         val queue = dao.getPendingQueue(nowSeconds())
         assertFalse(queue.any { it.messageId == "relay-me" })
     }

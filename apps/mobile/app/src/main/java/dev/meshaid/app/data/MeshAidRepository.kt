@@ -3,7 +3,6 @@ package dev.meshaid.app.data
 import android.util.Log
 import dev.meshaid.app.data.local.dao.MeshAidDao
 import dev.meshaid.app.data.local.entity.MeshAidMessageEntity
-import dev.meshaid.app.data.local.entity.MeshAidMessageEntity.RelayStatus
 import dev.meshaid.app.data.local.entity.SeenPacketEntity
 import dev.meshaid.app.protocol.MeshAidPacket
 import dev.meshaid.app.protocol.MeshAidPacketCodec
@@ -77,10 +76,14 @@ class MeshAidRepository(private val dao: MeshAidDao) {
         // 5. Persist
         val entity = MeshAidMessageEntity(
             messageId = messageId,
-            wireBytes = wireBytes,
             priority = packet.priority.tier,
+            hopCount = packet.hopCount,
+            createdAt = System.currentTimeMillis(),
             ttl = packet.ttlSeconds,
-            relayStatus = RelayStatus.PENDING
+            latitude = packet.latitude ?: Float.NaN,
+            longitude = packet.longitude ?: Float.NaN,
+            rawPacket = wireBytes,
+            isRelayed = false
         )
         val rowId = dao.insertMessage(entity)
         if (rowId == -1L) {
@@ -125,10 +128,10 @@ class MeshAidRepository(private val dao: MeshAidDao) {
     // ─── Status Updates ───────────────────────────────────────────────────────
 
     /**
-     * Marks a message as [RelayStatus.RELAYED] after a successful BLE broadcast.
+     * Marks a message as relayed after a successful BLE broadcast.
      */
     suspend fun markRelayed(messageId: String) {
-        dao.updateRelayStatus(messageId, RelayStatus.RELAYED)
+        dao.updateRelayStatus(messageId, isRelayed = true)
     }
 
     // ─── Maintenance ──────────────────────────────────────────────────────────

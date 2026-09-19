@@ -43,9 +43,9 @@ dependencies {
     implementation(libs.kotlinx.coroutines.android)
 
     // Room persistence
-    implementation(libs.room.runtime)
-    implementation(libs.room.ktx)
-    ksp(libs.room.compiler)
+    implementation("androidx.room:room-runtime:2.6.1")
+    implementation("androidx.room:room-ktx:2.6.1")
+    ksp("androidx.room:room-compiler:2.6.1")
 
     // Tests
     testImplementation(libs.junit)

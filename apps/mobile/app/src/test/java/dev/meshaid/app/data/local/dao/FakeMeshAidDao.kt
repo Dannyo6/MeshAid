@@ -70,16 +70,16 @@ class FakeMeshAidDao : MeshAidDao {
         nowSeconds: Long
     ): List<MeshAidMessageEntity> =
         map.values
-            .filter { it.relayStatus == MeshAidMessageEntity.RelayStatus.PENDING }
+            .filter { !it.isRelayed }
             .filter { it.ttl > nowSeconds }
             .sortedWith(compareBy<MeshAidMessageEntity> { it.priority }.thenByDescending { it.createdAt })
 
     // ─── Status Update ────────────────────────────────────────────────────────
 
-    override suspend fun updateRelayStatus(messageId: String, status: String) {
+    override suspend fun updateRelayStatus(messageId: String, isRelayed: Boolean) {
         messages.update { current ->
             val entity = current[messageId] ?: return@update current
-            current + (messageId to entity.copy(relayStatus = status))
+            current + (messageId to entity.copy(isRelayed = isRelayed))
         }
     }
 
@@ -98,7 +98,7 @@ class FakeMeshAidDao : MeshAidDao {
     override suspend fun pruneOldSeenPackets(cutoffTimestampMs: Long): Int {
         var count = 0
         seen.update { current ->
-            val (old, fresh) = current.values.partition { it.firstSeenTimestamp < cutoffTimestampMs }
+            val (old, fresh) = current.values.partition { it.firstSeenAt < cutoffTimestampMs }
             count = old.size
             fresh.associateBy { it.messageId }
         }
@@ -108,13 +108,13 @@ class FakeMeshAidDao : MeshAidDao {
     // ─── Overflow Eviction ────────────────────────────────────────────────────
 
     override suspend fun pendingCount(): Int =
-        messages.value.values.count { it.relayStatus == MeshAidMessageEntity.RelayStatus.PENDING }
+        messages.value.values.count { !it.isRelayed }
 
     override suspend fun evictLowPriorityPackets(dropCount: Int): Int {
         var evicted = 0
         messages.update { current ->
             val toEvict = current.values
-                .filter { it.relayStatus == MeshAidMessageEntity.RelayStatus.PENDING }
+                .filter { !it.isRelayed }
                 .sortedWith(compareByDescending<MeshAidMessageEntity> { it.priority }.thenBy { it.createdAt })
                 .take(dropCount)
                 .map { it.messageId }
@@ -131,6 +131,6 @@ class FakeMeshAidDao : MeshAidDao {
 
     override fun observePendingCount(): Flow<Int> =
         messages.map { map ->
-            map.values.count { it.relayStatus == MeshAidMessageEntity.RelayStatus.PENDING }
+            map.values.count { !it.isRelayed }
         }
 }

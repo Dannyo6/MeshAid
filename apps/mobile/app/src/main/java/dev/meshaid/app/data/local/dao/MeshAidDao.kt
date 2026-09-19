@@ -6,7 +6,6 @@ import androidx.room.OnConflictStrategy
 import androidx.room.Query
 import androidx.room.Transaction
 import dev.meshaid.app.data.local.entity.MeshAidMessageEntity
-import dev.meshaid.app.data.local.entity.MeshAidMessageEntity.RelayStatus
 import dev.meshaid.app.data.local.entity.SeenPacketEntity
 import kotlinx.coroutines.flow.Flow
 
@@ -17,7 +16,7 @@ import kotlinx.coroutines.flow.Flow
  * via Room's built-in coroutine integration.
  *
  * ### Priority Queue Contract
- * The outbound relay queue is ordered `priority ASC, created_at DESC`.
+ * The outbound relay queue is ordered `priority ASC, createdAt DESC`.
  * With priority stored as tier integer (0 = P0 Critical, 3 = P3 Low), `ASC` ordering
  * naturally surfaces the most urgent packets first.  Within the same priority bucket,
  * the most recently inserted packet is broadcast first (newest-first tiebreaker).
@@ -39,19 +38,14 @@ interface MeshAidDao {
     // ─── Priority Queue Read ──────────────────────────────────────────────────
 
     /**
-     * Returns all non-expired PENDING packets ordered by (priority ASC, createdAt DESC).
-     *
-     * TTL is compared against [currentTimestampSeconds] (Unix epoch seconds) so that
-     * callers can easily pass `System.currentTimeMillis() / 1000`.
-     *
-     * Backed by the composite index on `(priority, created_at)`.
+     * Returns all non-expired pending (not relayed) packets ordered by (priority ASC, createdAt DESC).
      */
     @Query(
         """
         SELECT * FROM mesh_messages
-        WHERE relay_status = 'PENDING'
+        WHERE isRelayed = 0
           AND ttl > :currentTimestampSeconds
-        ORDER BY priority ASC, created_at DESC
+        ORDER BY priority ASC, createdAt DESC
         """
     )
     fun observePendingQueue(currentTimestampSeconds: Long): Flow<List<MeshAidMessageEntity>>
@@ -62,9 +56,9 @@ interface MeshAidDao {
     @Query(
         """
         SELECT * FROM mesh_messages
-        WHERE relay_status = 'PENDING'
+        WHERE isRelayed = 0
           AND ttl > :currentTimestampSeconds
-        ORDER BY priority ASC, created_at DESC
+        ORDER BY priority ASC, createdAt DESC
         LIMIT :limit
         """
     )
@@ -84,26 +78,23 @@ interface MeshAidDao {
     /**
      * Returns `true` if [messageId] has already been processed on this node.
      */
-    @Query("SELECT COUNT(*) > 0 FROM seen_packets WHERE message_id = :messageId")
+    @Query("SELECT COUNT(*) > 0 FROM seen_packets WHERE messageId = :messageId")
     suspend fun hasSeen(messageId: String): Boolean
 
     // ─── Status Updates ───────────────────────────────────────────────────────
 
     /**
-     * Marks a packet as [RelayStatus.RELAYED] after it has been successfully broadcast.
+     * Updates relay status after successful broadcast.
      */
     @Query(
-        "UPDATE mesh_messages SET relay_status = :status WHERE message_id = :messageId"
+        "UPDATE mesh_messages SET isRelayed = :isRelayed WHERE messageId = :messageId"
     )
-    suspend fun updateRelayStatus(messageId: String, status: String)
+    suspend fun updateRelayStatus(messageId: String, isRelayed: Boolean = true)
 
     // ─── Expiry Pruning ───────────────────────────────────────────────────────
 
     /**
      * Deletes all packets whose TTL has elapsed.
-     * Should be called periodically (e.g. at the start of each advertising cycle).
-     *
-     * @return Number of rows deleted.
      */
     @Query(
         "DELETE FROM mesh_messages WHERE ttl <= :currentTimestampSeconds"
@@ -112,40 +103,30 @@ interface MeshAidDao {
 
     /**
      * Prunes stale seen-packet records older than [cutoffTimestampMs] (Unix millis).
-     * Keeps the seen-cache table compact.
-     *
-     * @return Number of rows deleted.
      */
     @Query(
-        "DELETE FROM seen_packets WHERE first_seen_timestamp < :cutoffTimestampMs"
+        "DELETE FROM seen_packets WHERE firstSeenAt < :cutoffTimestampMs"
     )
     suspend fun pruneOldSeenPackets(cutoffTimestampMs: Long): Int
 
     // ─── Overflow Eviction ────────────────────────────────────────────────────
 
     /**
-     * Returns the total number of PENDING rows (used to decide if eviction is needed).
+     * Returns the total number of pending rows.
      */
-    @Query("SELECT COUNT(*) FROM mesh_messages WHERE relay_status = 'PENDING'")
+    @Query("SELECT COUNT(*) FROM mesh_messages WHERE isRelayed = 0")
     suspend fun pendingCount(): Int
 
     /**
      * Evicts the lowest-priority (P3 → P2) packets when [pendingCount] > [threshold].
-     *
-     * The subquery selects the [dropCount] rows with the highest priority tier (least urgent)
-     * and oldest creation time, then deletes them — effectively shedding load from the back
-     * of the priority queue.
-     *
-     * @param threshold  Maximum number of PENDING rows to retain after eviction.
-     * @param dropCount  Number of rows to delete in this sweep.
      */
     @Query(
         """
         DELETE FROM mesh_messages
-        WHERE message_id IN (
-            SELECT message_id FROM mesh_messages
-            WHERE relay_status = 'PENDING'
-            ORDER BY priority DESC, created_at ASC
+        WHERE messageId IN (
+            SELECT messageId FROM mesh_messages
+            WHERE isRelayed = 0
+            ORDER BY priority DESC, createdAt ASC
             LIMIT :dropCount
         )
         """
@@ -154,8 +135,6 @@ interface MeshAidDao {
 
     /**
      * Atomic helper: check overflow and evict in a single DB transaction.
-     *
-     * @param maxQueueSize  Target maximum PENDING row count after this call.
      */
     @Transaction
     suspend fun enforceQueueCap(maxQueueSize: Int = 100) {
@@ -169,8 +148,8 @@ interface MeshAidDao {
     // ─── Observability ────────────────────────────────────────────────────────
 
     /**
-     * Live count of PENDING queue rows (useful for UI badges / debug overlays).
+     * Live count of pending queue rows.
      */
-    @Query("SELECT COUNT(*) FROM mesh_messages WHERE relay_status = 'PENDING'")
+    @Query("SELECT COUNT(*) FROM mesh_messages WHERE isRelayed = 0")
     fun observePendingCount(): Flow<Int>
 }
