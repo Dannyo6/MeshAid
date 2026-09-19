@@ -1,15 +1,14 @@
 <?xml version="1.0" encoding="utf-8"?>
-<manifest xmlns:android="http://schemas.android.com/apk/res/android"
-    package="dev.meshaid.app">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
     <!-- BLE & Radio Hardware Requirements -->
     <uses-feature android:name="android.hardware.bluetooth_le" android:required="true" />
     <uses-feature android:name="android.hardware.wifi.direct" android:required="false" />
 
-    <!-- Legacy Bluetooth Permissions (Android 11 and lower) -->
+    <!-- Legacy Bluetooth & Location Permissions (Android 11 and lower) -->
     <uses-permission android:name="android.permission.BLUETOOTH" android:maxSdkVersion="30" />
     <uses-permission android:name="android.permission.BLUETOOTH_ADMIN" android:maxSdkVersion="30" />
-    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" android:maxSdkVersion="30" />
 
     <!-- Modern Bluetooth Permissions (Android 12+) -->
     <uses-permission android:name="android.permission.BLUETOOTH_SCAN" />
@@ -31,6 +30,12 @@
         android:roundIcon="@android:drawable/ic_dialog_alert"
         android:supportsRtl="true"
         android:theme="@style/Theme.Material3.DayNight">
+
+        <service
+            android:name=".service.MeshRelayService"
+            android:enabled="true"
+            android:exported="false"
+            android:foregroundServiceType="connectedDevice" />
 
         <activity
             android:name=".ui.MainActivity"
