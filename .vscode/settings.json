@@ -1,0 +1,10 @@
+{
+  "java.jdt.ls.java.home": "C:\\Program Files\\JetBrains\\PyCharm Community Edition 2024.3.1.1\\jbr",
+  "java.configuration.runtimes": [
+    {
+      "name": "JavaSE-21",
+      "path": "C:\\Program Files\\JetBrains\\PyCharm Community Edition 2024.3.1.1\\jbr",
+      "default": true
+    }
+  ]
+}
