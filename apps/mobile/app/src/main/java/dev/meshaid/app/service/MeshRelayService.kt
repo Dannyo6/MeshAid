@@ -15,7 +15,12 @@ import android.util.Log
 import androidx.core.app.NotificationCompat
 import dev.meshaid.app.ble.BleAdvertiserManager
 import dev.meshaid.app.ble.BleScannerManager
+import dev.meshaid.app.data.MeshAidRepository
+import dev.meshaid.app.data.MeshAidRepository.IngestResult
+import dev.meshaid.app.data.local.MeshAidDatabase
+import dev.meshaid.app.data.local.entity.MeshAidMessageEntity
 import dev.meshaid.app.protocol.MeshAidPacket
+import dev.meshaid.app.protocol.MeshAidPacketCodec
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -26,12 +31,20 @@ import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
-import java.util.concurrent.ConcurrentHashMap
-import java.util.concurrent.CopyOnWriteArrayList
 
 /**
  * Android Foreground Service maintaining continuous scanning and cyclic advertisement
  * of queued emergency packets without being suspended by Doze mode.
+ *
+ * ### Phase 3 changes
+ * The in-memory [CopyOnWriteArrayList] / [ConcurrentHashMap] pair has been replaced by
+ * [MeshAidRepository], which persists packets to Room and provides:
+ * - Priority-ranked, TTL-filtered queue snapshots.
+ * - Atomic deduplication via the seen-packet cache.
+ * - Automatic expiry pruning and overflow eviction.
+ *
+ * The cyclic advertising loop now reads directly from the Room-backed repository,
+ * so no queue state is lost if the process is restarted by the OS.
  */
 class MeshRelayService : Service() {
 
@@ -41,7 +54,6 @@ class MeshRelayService : Service() {
         private const val CHANNEL_ID = "meshaid_relay_channel"
         private const val CHANNEL_NAME = "MeshAid Emergency Relay"
         private const val CYCLIC_ADVERTISE_INTERVAL_MS = 2500L
-        private const val MAX_QUEUE_SIZE = 100
         private const val MAX_RELAY_HOPS = 7
 
         const val ACTION_START_RELAY = "dev.meshaid.app.action.START_RELAY"
@@ -53,11 +65,8 @@ class MeshRelayService : Service() {
 
     private lateinit var advertiserManager: BleAdvertiserManager
     private lateinit var scannerManager: BleScannerManager
+    private lateinit var repository: MeshAidRepository
     private var wakeLock: PowerManager.WakeLock? = null
-
-    // Relay queue: thread-safe copy-on-write list prioritized by emergency tier
-    private val packetQueue = CopyOnWriteArrayList<MeshAidPacket>()
-    private val processedMessageIds = ConcurrentHashMap<String, Long>()
 
     private val _relayedPacketsFlow = MutableSharedFlow<MeshAidPacket>(extraBufferCapacity = 64)
     val relayedPacketsFlow: SharedFlow<MeshAidPacket> = _relayedPacketsFlow.asSharedFlow()
@@ -70,7 +79,11 @@ class MeshRelayService : Service() {
 
     override fun onCreate() {
         super.onCreate()
-        Log.i(TAG, "Initializing MeshRelayService")
+        Log.i(TAG, "Initializing MeshRelayService (Phase 3 – Room-backed)")
+
+        // Wire up Room-backed repository
+        val db = MeshAidDatabase.getInstance(applicationContext)
+        repository = MeshAidRepository(db.meshAidDao())
 
         advertiserManager = BleAdvertiserManager(this)
         scannerManager = BleScannerManager(this)
@@ -100,81 +113,84 @@ class MeshRelayService : Service() {
 
     override fun onBind(intent: Intent?): IBinder = binder
 
+    // ─── Public API ───────────────────────────────────────────────────────────
+
     /**
-     * Enqueues an emergency packet for cyclic relay advertisement
+     * Enqueues an emergency packet for cyclic relay advertisement.
+     *
+     * Delegates to [MeshAidRepository.ingest], which handles deduplication,
+     * TTL validation, encoding, and Room persistence.
      */
     fun enqueuePacket(packet: MeshAidPacket) {
-        if (packet.isExpired()) {
-            Log.w(TAG, "Refusing to enqueue expired packet: ${packet.messageIdHex}")
-            return
+        serviceScope.launch(Dispatchers.IO) {
+            val result = repository.ingest(packet)
+            when (result) {
+                IngestResult.ACCEPTED -> Log.i(TAG, "Enqueued via repository: ${packet.messageIdHex}")
+                IngestResult.DUPLICATE -> Log.d(TAG, "Duplicate suppressed: ${packet.messageIdHex}")
+                IngestResult.EXPIRED -> Log.w(TAG, "Packet expired at ingestion: ${packet.messageIdHex}")
+                IngestResult.ERROR -> Log.e(TAG, "Failed to persist packet: ${packet.messageIdHex}")
+            }
         }
-
-        // Avoid exact duplicate in active queue
-        if (packetQueue.any { it.messageIdHex == packet.messageIdHex }) {
-            return
-        }
-
-        packetQueue.add(packet)
-        sortQueueByPriority()
-
-        // Trim queue if size exceeds max bound
-        while (packetQueue.size > MAX_QUEUE_SIZE) {
-            packetQueue.removeAt(packetQueue.lastIndex)
-        }
-
-        Log.i(TAG, "Enqueued packet ${packet.messageIdHex} (Priority: ${packet.priority}, QueueSize: ${packetQueue.size})")
     }
 
-    fun getQueuedPackets(): List<MeshAidPacket> = packetQueue.toList()
-
-    private fun sortQueueByPriority() {
-        packetQueue.sortWith(
-            compareBy<MeshAidPacket> { it.priority.tier }
-                .thenByDescending { it.timestampSeconds }
-        )
-    }
+    // ─── Inbound Packet Handling ──────────────────────────────────────────────
 
     private fun setupInboundPacketHandling() {
         scannerManager.onPacketReceived = { inboundPacket ->
-            val msgId = inboundPacket.messageIdHex
-            val now = System.currentTimeMillis()
+            serviceScope.launch(Dispatchers.IO) {
+                val result = repository.ingest(inboundPacket)
 
-            // Deduplication: prevent infinite loops across peers
-            val lastSeen = processedMessageIds[msgId]
-            if (lastSeen == null || (now - lastSeen) > 60_000L) {
-                processedMessageIds[msgId] = now
+                if (result == IngestResult.ACCEPTED) {
+                    Log.i(TAG, "Relaying inbound packet: ${inboundPacket.messageIdHex} (Hops: ${inboundPacket.hopCount})")
+                    _relayedPacketsFlow.tryEmit(inboundPacket)
 
-                Log.i(TAG, "Relaying inbound packet: $msgId (Hops: ${inboundPacket.hopCount})")
-                _relayedPacketsFlow.tryEmit(inboundPacket)
-
-                // Store-carry-forward: increment hop count and re-queue if under max hops
-                if (inboundPacket.hopCount < MAX_RELAY_HOPS) {
-                    val relayedCopy = inboundPacket.copy(hopCount = inboundPacket.hopCount + 1)
-                    enqueuePacket(relayedCopy)
+                    // Store-carry-forward: bump hop count and re-ingest for relay
+                    if (inboundPacket.hopCount < MAX_RELAY_HOPS) {
+                        val relayedCopy = inboundPacket.copy(hopCount = inboundPacket.hopCount + 1)
+                        repository.ingest(relayedCopy)
+                    }
                 }
             }
         }
     }
 
+    // ─── Cyclic Advertisement Loop ────────────────────────────────────────────
+
     /**
-     * Cyclic advertisement loop: rotates through queued emergency packets
+     * Runs the store-and-forward advertising loop:
+     * 1. Maintenance sweep (expiry pruning + seen-cache compaction).
+     * 2. Fetch the priority-ranked pending queue from Room.
+     * 3. Round-robin broadcast each packet, marking it [RelayStatus.RELAYED] after success.
      */
     private fun startCyclicAdvertisingLoop() {
-        serviceScope.launch {
+        serviceScope.launch(Dispatchers.IO) {
             var currentIdx = 0
             while (isActive) {
-                // Purge expired packets
-                val nowSeconds = System.currentTimeMillis() / 1000L
-                packetQueue.removeAll { it.isExpired(nowSeconds) }
+                // Step 1 – maintenance
+                repository.runMaintenance()
 
-                if (packetQueue.isNotEmpty()) {
-                    currentIdx = currentIdx % packetQueue.size
-                    val packetToBroadcast = packetQueue[currentIdx]
+                // Step 2 – fetch current queue snapshot
+                val pendingQueue: List<MeshAidMessageEntity> = repository.getPendingQueue()
 
-                    Log.d(TAG, "Cyclic broadcasting packet: ${packetToBroadcast.messageIdHex} (Tier: ${packetToBroadcast.priority})")
-                    advertiserManager.broadcastPacket(packetToBroadcast)
+                if (pendingQueue.isNotEmpty()) {
+                    currentIdx = currentIdx % pendingQueue.size
+                    val entityToBroadcast = pendingQueue[currentIdx]
 
-                    currentIdx = (currentIdx + 1) % packetQueue.size
+                    // Re-decode the wire bytes for the advertiser
+                    val packetToBroadcast = try {
+                        MeshAidPacketCodec.decodePacket(entityToBroadcast.wireBytes)
+                    } catch (e: Exception) {
+                        Log.e(TAG, "Failed to decode queued packet ${entityToBroadcast.messageId}: ${e.message}")
+                        null
+                    }
+
+                    if (packetToBroadcast != null) {
+                        Log.d(TAG, "Cyclic broadcasting: ${entityToBroadcast.messageId} (priority=${entityToBroadcast.priority})")
+                        advertiserManager.broadcastPacket(packetToBroadcast)
+                        repository.markRelayed(entityToBroadcast.messageId)
+                    }
+
+                    currentIdx = (currentIdx + 1) % pendingQueue.size
                 } else {
                     // Queue empty: halt active advertisement until new packets arrive
                     if (advertiserManager.isAdvertising) {
@@ -186,6 +202,8 @@ class MeshRelayService : Service() {
             }
         }
     }
+
+    // ─── Wake Lock ────────────────────────────────────────────────────────────
 
     private fun acquireWakeLock() {
         val powerManager = getSystemService(Context.POWER_SERVICE) as? PowerManager
@@ -209,6 +227,8 @@ class MeshRelayService : Service() {
             Log.w(TAG, "Error releasing wake lock: ${e.message}")
         }
     }
+
+    // ─── Notification ─────────────────────────────────────────────────────────
 
     private fun createNotificationChannel() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
@@ -248,6 +268,8 @@ class MeshRelayService : Service() {
             startForeground(NOTIFICATION_ID, notification)
         }
     }
+
+    // ─── Lifecycle ────────────────────────────────────────────────────────────
 
     override fun onDestroy() {
         super.onDestroy()
