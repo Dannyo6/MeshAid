@@ -1,13 +1,13 @@
 # Contributing to MeshAid
 
-Thank you for your interest in contributing to **MeshAid** under the **ADROIT** Technical Club.
+Thank you for your interest in contributing to **MeshAid**.
 
 MeshAid is a specialized distributed systems and computer networks project with strict architectural constraints. Please review the following guidelines before contributing.
 
 ---
 
 ## 🚫 Non-AI Contribution Policy
-MeshAid is strictly an **AI-free project** per ADROIT competition rules.
+MeshAid enforces a strict **non-AI architectural constraint**.
 - Pull requests introducing machine learning frameworks, LLM wrappers, computer vision, heuristic neural networks, or AI automations will be **immediately closed**.
 - All contributions must rely on fundamental algorithms in networking, distributed state synchronization, and cryptography.
 

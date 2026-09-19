@@ -1,7 +1,7 @@
 # Security Policy
 
 ## 1. Supported Versions
-MeshAid is currently in active pre-alpha development under ADROIT. Only the latest commit on `main` receives security patches.
+MeshAid is currently in active pre-alpha development. Only the latest commit on `main` receives security patches.
 
 | Version / Branch | Supported |
 | :--- | :--- |

@@ -69,9 +69,9 @@ Features to be introduced once the core three-node physical relay is demonstrate
 ---
 
 ## 3. Explicit Non-Goals
-To protect project focus and deliver a robust networking foundation within the club timeline, the following are **explicitly out of scope**:
+To protect project focus and engineer a robust, mathematically verifiable networking foundation, the following are **explicitly out of scope**:
 
-- **No Artificial Intelligence / Machine Learning**: Zero use of neural networks, LLMs, predictive ML routing, or agentic automation per ADROIT competition rules.
+- **No Artificial Intelligence / Machine Learning**: Zero use of neural networks, LLMs, predictive ML routing, or probabilistic agents. The project strictly enforces deterministic, energy-frugal systems-engineering algorithms.
 - **No General-Purpose Social Chatting**: MeshAid is strictly an emergency incident and relief logistics protocol, not a real-time conversational messaging app like WhatsApp or Telegram.
 - **No Voice Calling or Real-Time Streaming**: BLE and opportunistic store-carry-forward topologies have intermittent, multi-minute or multi-hour latencies completely incompatible with synchronous audio/video streams.
 - **No Centralized PKI / Certificate Authorities**: Offline disaster zones cannot contact certificate revocation lists or online trust authorities; identity must rely on decentralized cryptography (TOFU, local pairing, or municipal emergency keys).

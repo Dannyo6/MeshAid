@@ -4,7 +4,7 @@
 
 - **Status**: Accepted
 - **Date**: 2026-09-18
-- **Authors**: MeshAid Engineering Team (ADROIT)
+- **Authors**: MeshAid Systems Architecture Team
 - **Deciders**: Technical Leads, Systems Architecture
 
 ---
@@ -54,7 +54,7 @@ We have chosen **Native Android (Kotlin)** as the primary mobile development sta
 
 - **Trade-off: Loss of Instant iOS Support**:
   - *Analysis*: iOS restricts background BLE advertising to a special Apple proprietary overflow area and prohibits dynamic GATT server modifications in the background. Meaningful background multi-hop mesh on iOS is severely limited by Apple sandbox policies.
-  - *Mitigation*: The academic and club demonstration targets Android devices, where open hardware access and foreground services permit genuine opportunistic store-carry-forward.
+  - *Mitigation*: The primary demonstration targets Android devices, where open hardware access and foreground services permit genuine opportunistic store-carry-forward.
 - **Trade-off: Initial Scaffolding Overhead**:
   - *Analysis*: Setting up modern Android Gradle builds requires JDK 17+ and the Android SDK.
   - *Mitigation*: Scaffolding is decoupled into modular directories (`apps/mobile` for Android, `packages/protocol` for pure protocol and simulation logic, `services/backend` for gateway sync, `apps/dashboard` for the web responder portal). The protocol and simulation tests can build and execute immediately in any environment with Node.js.

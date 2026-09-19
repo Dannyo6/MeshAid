@@ -4,11 +4,11 @@ plugins {
 }
 
 android {
-    namespace = "org.adroit.meshaid"
+    namespace = "dev.meshaid.app"
     compileSdk = 34
 
     defaultConfig {
-        applicationId = "org.adroit.meshaid"
+        applicationId = "dev.meshaid.app"
         minSdk = 26
         targetSdk = 34
         versionCode = 1

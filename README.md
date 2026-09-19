@@ -3,7 +3,7 @@
 [![CI](https://github.com/Dannyo6/meshaid/actions/workflows/ci.yml/badge.svg)](https://github.com/Dannyo6/meshaid/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Domain: Distributed Systems](https://img.shields.io/badge/Domain-Distributed%20Systems%20%7C%20Networks-orange.svg)](#)
-[![Strict Non-AI](https://img.shields.io/badge/AI--Free-Adroit%20Rule%20Compliant-success.svg)](#)
+[![Strict Non-AI](https://img.shields.io/badge/Architecture-Strictly%20Non--AI-success.svg)](#)
 
 > **"MeshAid is a resilient emergency communication network that enables critical messages to propagate opportunistically across intermittently connected devices until they reach a destination, responder, or gateway."**
 
@@ -11,12 +11,14 @@
 
 ## 📌 Project Overview
 
-**MeshAid** is a decentralized, offline communication system developed as a student technical-club project under **ADROIT**. It operates on the principle of **Store-Carry-Forward** Delay/Disruption-Tolerant Networking (DTN).
+**MeshAid** is an independent, decentralized systems-engineering project exploring delay-tolerant emergency communication under intermittent and collapsed infrastructure. It operates on the principle of **Store-Carry-Forward** Delay/Disruption-Tolerant Networking (DTN).
 
 During severe infrastructure failures (earthquakes, floods, grid blackouts, or remote search-and-rescue operations), commercial cellular towers and internet connections frequently collapse. MeshAid transforms standard smartphones into mobile, opportunistic relay nodes that communicate peer-to-peer using **Bluetooth Low Energy (BLE)** and **Wi-Fi Direct (P2P)**.
 
-### 🚫 Non-AI Engineering Project
-In strict accordance with ADROIT technical specifications, MeshAid is an **AI-free project**. It relies entirely on fundamental principles of:
+### 🚫 Strict Non-AI Architectural Constraint
+MeshAid is engineered under an intentional, strict **non-AI architectural mandate**. In mission-critical emergency disaster environments where edge devices experience severe battery, compute, and memory constraints, non-deterministic models (LLMs, neural networks, heuristic AI agents) introduce unacceptable latency, compute overhead, and reliability failure modes.
+
+MeshAid relies entirely on deterministic, verifiable systems-engineering foundations:
 - **Computer Networks** (Ad-hoc peer discovery, dual-role BLE GATT servers, wire protocol serialization, MTU fragmentation).
 - **Distributed Systems** (Store-carry-forward DTN routing, priority queues, Bloom filter deduplication, TTL aging).
 - **Cybersecurity** (Ed25519 asymmetric message signatures, SHA-256 integrity hashing, anti-flooding rate limits).

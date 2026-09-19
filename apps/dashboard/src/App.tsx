@@ -4,7 +4,7 @@ export function App() {
       <header style={{ borderBottom: '2px solid #e2e8f0', paddingBottom: '1rem', marginBottom: '2rem' }}>
         <h1 style={{ color: '#b91c1c', margin: 0 }}>MeshAid Emergency Incident Center</h1>
         <p style={{ color: '#4b5563', margin: '0.5rem 0 0 0' }}>
-          Real-time incident feed synchronized from opportunistic mesh gateways. (ADROIT Non-AI Project)
+          Real-time incident feed synchronized from opportunistic mesh gateways.
         </p>
       </header>
 

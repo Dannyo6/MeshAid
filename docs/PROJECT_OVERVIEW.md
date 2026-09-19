@@ -4,7 +4,7 @@
 - **Project Name**: MeshAid
 - **Full Title**: MeshAid: Offline Emergency Communication & Relay Network
 - **Short Description**: MeshAid is a resilient emergency communication network that enables critical messages to propagate opportunistically across intermittently connected devices until they reach a destination, responder, or gateway.
-- **Organization / Club**: Student Technical-Club Project under **ADROIT**
+- **Project Type**: Independent Systems Engineering & Research Project
 - **Core Concept**: **Store-Carry-Forward Communication** (Delay/Disruption-Tolerant Networking)
 
 ---
@@ -30,9 +30,9 @@ An intermediate node (Device B) does not require a simultaneous link to Device C
 ---
 
 ## 3. Strict Non-AI Engineering Mandate
-ADROIT requires an innovative, technically rigorous, buildable engineering project grounded strictly in non-AI domains.
+MeshAid is intentionally engineered under a rigorous, foundational **non-AI architectural mandate**. 
 
-MeshAid is **intentionally and strictly a non-AI project**. 
+In emergency scenarios with degraded or collapsed infrastructure, relying on probabilistic AI inference, large parameter models, or neural networks introduces non-deterministic failure modes, prohibitive battery consumption, and unpredictable latency. MeshAid enforces absolute determinism, transparency, and computational frugality by operating strictly on verifiable systems-engineering principles:
 - **Prohibited technologies**: Machine Learning, Deep Learning, Large Language Models (LLMs), RAG, Agentic AI, Generative AI, Computer Vision, or heuristic AI automations.
 - **Primary engineering domains**:
   - **Computer Networks**: Protocol design, packet serialization, MTU management, dual-role BLE (GATT Server/Client), Wi-Fi Direct (P2P), ad-hoc peer discovery.

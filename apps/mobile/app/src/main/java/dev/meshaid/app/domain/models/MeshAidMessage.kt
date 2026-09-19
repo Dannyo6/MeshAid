@@ -1,4 +1,4 @@
-package org.adroit.meshaid.domain.models
+package dev.meshaid.app.domain.models
 
 /**
  * Core MeshAid Message Envelope Model for Android Node
