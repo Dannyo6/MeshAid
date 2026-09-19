@@ -4,8 +4,8 @@
 
 - **Status**: Accepted
 - **Date**: 2026-09-18
-- **Authors**: MeshAid Systems Architecture Team
-- **Deciders**: Technical Leads, Systems Architecture
+- **Author**: Dhanush V
+- **Role**: Lead Systems Architect & Developer
 
 ---
 
@@ -18,7 +18,7 @@ The core wireless mechanism demands:
 3. **Future Wi-Fi Direct Integration**: High-bandwidth data transfers (emergency bulletins, resource maps, medical data) require Wi-Fi Direct (P2P) Group Owner negotiation and raw TCP socket streaming.
 4. **Reliable Multi-Device Physical Testing**: Seamless deployment and direct debugging across at least three physical test devices (Node A, Node B, Node C).
 
-We evaluated two primary options:
+This architectural evaluation considers two primary options:
 - **Option A**: Flutter (Cross-platform Dart framework)
 - **Option B**: Native Android (Kotlin) with a Decoupled Protocol Engine
 
@@ -41,7 +41,7 @@ We evaluated two primary options:
 
 ### Decision: **Option B — Native Android (Kotlin) for Mobile Node, with a Decoupled Cross-Platform Protocol Engine**
 
-We have chosen **Native Android (Kotlin)** as the primary mobile development stack for MeshAid, supplemented by a **Decoupled TypeScript Protocol Engine** for continuous simulation and backend/dashboard interoperability.
+The chosen architecture adopts **Native Android (Kotlin)** as the primary mobile development stack for MeshAid, supplemented by a **Decoupled TypeScript Protocol Engine** for continuous simulation and backend/dashboard interoperability.
 
 ### Rationale:
 1. **Technical Reliability over Cross-Platform Convenience**: MeshAid's core identity is a **networking and distributed systems project**, not a simple UI application. Cross-platform abstractions that compromise Bluetooth Low Energy dual-mode stability or background service survival defeat the project's primary technical purpose.

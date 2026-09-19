@@ -2,7 +2,7 @@
 
 Thank you for your interest in contributing to **MeshAid**.
 
-MeshAid is a specialized distributed systems and computer networks project with strict architectural constraints. Please review the following guidelines before contributing.
+MeshAid is an independent, specialized distributed systems and computer networks project authored by **Dhanush V**. It enforces strict architectural constraints for offline, delay-tolerant emergency communications. Please review the following guidelines before contributing.
 
 ---
 

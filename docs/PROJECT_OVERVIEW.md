@@ -3,8 +3,9 @@
 ## Project Identity
 - **Project Name**: MeshAid
 - **Full Title**: MeshAid: Offline Emergency Communication & Relay Network
-- **Short Description**: MeshAid is a resilient emergency communication network that enables critical messages to propagate opportunistically across intermittently connected devices until they reach a destination, responder, or gateway.
+- **Author**: Dhanush V
 - **Project Type**: Independent Systems Engineering & Research Project
+- **Short Description**: MeshAid is a resilient emergency communication network that enables critical messages to propagate opportunistically across intermittently connected devices until they reach a destination, responder, or gateway.
 - **Core Concept**: **Store-Carry-Forward Communication** (Delay/Disruption-Tolerant Networking)
 
 ---

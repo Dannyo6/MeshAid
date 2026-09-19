@@ -108,7 +108,7 @@ Opportunistic networking relies on human and vehicular mobility to bridge physic
 
 ### Explicit Constraints:
 - Zero cloud/internet dependence for core offline operation.
-- Zero AI/ML models permitted per project mandate.
+- Strict non-AI architecture: Zero probabilistic AI/ML models permitted; routing and synchronization enforce deterministic finite state machines, ultra-low power consumption, bounded resource usage, and offline edge resilience.
 - Physical transmission range per hop over standard smartphone BLE is typically 10 to 30 meters outdoors, reduced by walls/rubble.
 - BLE bandwidth is strictly limited; packet designs must be compact (binary or minified JSON).
 

@@ -128,6 +128,9 @@ npm run build
 
 ---
 
+## 👤 Author
+**Dhanush V** ([@Dannyo6](https://github.com/Dannyo6))
+
 ## 🤝 Contributing
 Contributions are governed by strict commit guidelines and protocol standards. Please read [CONTRIBUTING.md](CONTRIBUTING.md) before submitting pull requests.
 
