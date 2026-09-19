@@ -10,8 +10,8 @@
   ],
   "scripts": {
     "test": "npm run test --workspace=packages/protocol",
-    "build": "npm run build --workspace=packages/protocol",
-    "lint": "npm run lint --workspace=packages/protocol"
+    "build": "npm run build --workspaces --if-present",
+    "lint": "npm run lint --workspaces --if-present"
   },
   "keywords": [
     "emergency-communication",

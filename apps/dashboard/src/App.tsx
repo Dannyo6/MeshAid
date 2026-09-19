@@ -1,5 +1,3 @@
-import React from 'react';
-
 export function App() {
   return (
     <div style={{ fontFamily: 'sans-serif', padding: '2rem', maxWidth: '1200px', margin: '0 auto' }}>
