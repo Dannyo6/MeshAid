@@ -27,8 +27,11 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 
@@ -58,6 +61,9 @@ class MeshRelayService : Service() {
 
         const val ACTION_START_RELAY = "dev.meshaid.app.action.START_RELAY"
         const val ACTION_STOP_RELAY = "dev.meshaid.app.action.STOP_RELAY"
+
+        private val _isServiceRunning = MutableStateFlow(false)
+        val isServiceRunning: StateFlow<Boolean> = _isServiceRunning.asStateFlow()
     }
 
     private val serviceJob = SupervisorJob()
@@ -80,6 +86,7 @@ class MeshRelayService : Service() {
     override fun onCreate() {
         super.onCreate()
         Log.i(TAG, "Initializing MeshRelayService (Phase 3 – Room-backed)")
+        _isServiceRunning.value = true
 
         // Wire up Room-backed repository
         val db = MeshAidDatabase.getInstance(applicationContext)
@@ -125,10 +132,37 @@ class MeshRelayService : Service() {
         serviceScope.launch(Dispatchers.IO) {
             val result = repository.ingest(packet)
             when (result) {
-                IngestResult.ACCEPTED -> Log.i(TAG, "Enqueued via repository: ${packet.messageIdHex}")
+                IngestResult.ACCEPTED -> {
+                    Log.i(TAG, "Enqueued via repository: ${packet.messageIdHex}")
+                    triggerImmediateAdvertising()
+                }
                 IngestResult.DUPLICATE -> Log.d(TAG, "Duplicate suppressed: ${packet.messageIdHex}")
                 IngestResult.EXPIRED -> Log.w(TAG, "Packet expired at ingestion: ${packet.messageIdHex}")
                 IngestResult.ERROR -> Log.e(TAG, "Failed to persist packet: ${packet.messageIdHex}")
+            }
+        }
+    }
+
+    /**
+     * Wakes up and triggers an immediate advertising sweep for high-priority queued packets
+     * without waiting for the cyclic interval timer.
+     */
+    fun triggerImmediateAdvertising() {
+        serviceScope.launch(Dispatchers.IO) {
+            val pendingQueue = repository.getPendingQueue()
+            if (pendingQueue.isNotEmpty()) {
+                val entityToBroadcast = pendingQueue.first()
+                val packetToBroadcast = try {
+                    MeshAidPacketCodec.decodePacket(entityToBroadcast.wireBytes)
+                } catch (e: Exception) {
+                    Log.e(TAG, "Failed to decode packet for immediate advertising: ${e.message}")
+                    null
+                }
+                if (packetToBroadcast != null) {
+                    Log.i(TAG, "Triggering immediate BLE broadcast: ${entityToBroadcast.messageId} (priority=${entityToBroadcast.priority})")
+                    advertiserManager.broadcastPacket(packetToBroadcast)
+                    repository.markRelayed(entityToBroadcast.messageId)
+                }
             }
         }
     }
@@ -274,6 +308,7 @@ class MeshRelayService : Service() {
     override fun onDestroy() {
         super.onDestroy()
         Log.i(TAG, "Destroying MeshRelayService")
+        _isServiceRunning.value = false
         serviceScope.cancel()
         scannerManager.stopScan()
         advertiserManager.stopAdvertising()

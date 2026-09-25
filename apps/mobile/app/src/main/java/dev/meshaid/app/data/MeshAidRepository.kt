@@ -4,6 +4,7 @@ import android.util.Log
 import dev.meshaid.app.data.local.dao.MeshAidDao
 import dev.meshaid.app.data.local.entity.MeshAidMessageEntity
 import dev.meshaid.app.data.local.entity.SeenPacketEntity
+import dev.meshaid.app.domain.models.Priority
 import dev.meshaid.app.protocol.MeshAidPacket
 import dev.meshaid.app.protocol.MeshAidPacketCodec
 import kotlinx.coroutines.flow.Flow
@@ -60,8 +61,13 @@ class MeshAidRepository(private val dao: MeshAidDao) {
 
         // 3. Expiry guard
         val nowSeconds = System.currentTimeMillis() / 1000L
-        if (packet.ttlSeconds <= nowSeconds) {
-            Log.w(TAG, "Ignoring already-expired packet: $messageId (ttl=${packet.ttlSeconds})")
+        val expiryTimestamp = if (packet.ttlSeconds < 1_000_000_000L) {
+            packet.timestampSeconds + packet.ttlSeconds
+        } else {
+            packet.ttlSeconds
+        }
+        if (expiryTimestamp <= nowSeconds) {
+            Log.w(TAG, "Ignoring already-expired packet: $messageId (expiry=$expiryTimestamp, now=$nowSeconds)")
             return IngestResult.EXPIRED
         }
 
@@ -79,7 +85,7 @@ class MeshAidRepository(private val dao: MeshAidDao) {
             priority = packet.priority.tier,
             hopCount = packet.hopCount,
             createdAt = System.currentTimeMillis(),
-            ttl = packet.ttlSeconds,
+            ttl = expiryTimestamp,
             latitude = packet.latitude ?: Float.NaN,
             longitude = packet.longitude ?: Float.NaN,
             rawPacket = wireBytes,
@@ -124,6 +130,62 @@ class MeshAidRepository(private val dao: MeshAidDao) {
      * Live count of pending relay packets.
      */
     fun observePendingCount(): Flow<Int> = dao.observePendingCount()
+
+    /**
+     * Live count of deduplication cache (seen packets).
+     */
+    fun observeSeenCount(): Flow<Int> = dao.observeSeenCount()
+
+    /**
+     * Live list of recent bulletins / messages ordered by creation time newest-first.
+     */
+    fun observeRecentMessages(limit: Int = 50): Flow<List<MeshAidMessageEntity>> =
+        dao.observeRecentMessages(limit)
+
+    /**
+     * Inserts an outbound emergency message created by the user node.
+     *
+     * Constructs a [MeshAidPacket] with the given priority, headcount, notes, and coordinates,
+     * encodes it and persists it via [ingest].
+     */
+    suspend fun insertOutboundMessage(
+        priority: Priority,
+        notes: String,
+        headcount: Int = 1,
+        latitude: Float? = null,
+        longitude: Float? = null,
+        ttlSeconds: Long = 14400L
+    ): IngestResult {
+        val randomId = ByteArray(8).apply { java.security.SecureRandom().nextBytes(this) }
+        val payloadTypeStr = when (priority) {
+            Priority.CIVILIAN_SOS -> "SOS"
+            Priority.RESOURCE_LOGISTICS -> "RESOURCE_REQ"
+            Priority.GENERAL_INFO -> "BULLETIN"
+            Priority.EMERGENCY_AUTHORITY -> "EMERGENCY"
+        }
+        val escapedNotes = notes.replace("\\", "\\\\").replace("\"", "\\\"").replace("\n", " ")
+        val payloadJson = """{"type":"$payloadTypeStr","headcount":$headcount,"notes":"$escapedNotes"}"""
+        val packet = MeshAidPacket(
+            version = 1,
+            priority = priority,
+            hopCount = 0,
+            messageId = randomId,
+            timestampSeconds = System.currentTimeMillis() / 1000L,
+            ttlSeconds = ttlSeconds,
+            latitude = latitude,
+            longitude = longitude,
+            signature = ByteArray(64),
+            payload = payloadJson.toByteArray(Charsets.UTF_8)
+        )
+        return ingest(packet)
+    }
+
+    /**
+     * Overload: Inserts an outbound [MeshAidPacket] directly.
+     */
+    suspend fun insertOutboundMessage(packet: MeshAidPacket): IngestResult {
+        return ingest(packet)
+    }
 
     // ─── Status Updates ───────────────────────────────────────────────────────
 

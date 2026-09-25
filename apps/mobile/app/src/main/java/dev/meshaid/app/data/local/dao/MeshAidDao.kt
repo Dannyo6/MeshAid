@@ -152,4 +152,16 @@ interface MeshAidDao {
      */
     @Query("SELECT COUNT(*) FROM mesh_messages WHERE isRelayed = 0")
     fun observePendingCount(): Flow<Int>
+
+    /**
+     * Live count of deduplication cache (seen packets).
+     */
+    @Query("SELECT COUNT(*) FROM seen_packets")
+    fun observeSeenCount(): Flow<Int>
+
+    /**
+     * Live list of recent bulletins / messages ordered by creation time newest-first.
+     */
+    @Query("SELECT * FROM mesh_messages ORDER BY createdAt DESC LIMIT :limit")
+    fun observeRecentMessages(limit: Int = 50): Flow<List<MeshAidMessageEntity>>
 }

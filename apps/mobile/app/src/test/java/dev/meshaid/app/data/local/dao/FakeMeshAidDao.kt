@@ -133,4 +133,12 @@ class FakeMeshAidDao : MeshAidDao {
         messages.map { map ->
             map.values.count { !it.isRelayed }
         }
+
+    override fun observeSeenCount(): Flow<Int> =
+        seen.map { it.size }
+
+    override fun observeRecentMessages(limit: Int): Flow<List<MeshAidMessageEntity>> =
+        messages.map { map ->
+            map.values.sortedByDescending { it.createdAt }.take(limit)
+        }
 }
