@@ -6,14 +6,19 @@
   "type": "module",
   "scripts": {
     "start": "node --experimental-strip-types src/server.ts",
+    "test": "node --experimental-strip-types --test tests/sync.test.ts",
     "build": "tsc",
     "lint": "tsc --noEmit"
   },
   "dependencies": {
-    "@meshaid/protocol": "*"
+    "@meshaid/protocol": "*",
+    "ws": "^8.21.3"
   },
   "devDependencies": {
     "@types/node": "^22.10.1",
+    "@types/supertest": "^7.2.1",
+    "@types/ws": "^8.18.1",
+    "supertest": "^7.3.0",
     "typescript": "^5.7.2"
   },
   "author": "Dhanush V",

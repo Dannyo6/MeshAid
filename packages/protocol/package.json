@@ -7,7 +7,7 @@
   "type": "module",
   "scripts": {
     "build": "tsc",
-    "test": "node --experimental-strip-types --test tests/relay.test.ts",
+    "test": "node --experimental-strip-types --test tests/relay.test.ts tests/codec.test.ts",
     "lint": "tsc --noEmit"
   },
   "keywords": [

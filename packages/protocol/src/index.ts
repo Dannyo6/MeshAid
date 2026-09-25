@@ -7,3 +7,4 @@ export type { PayloadType, GeoLocation, MeshAidEnvelope, MessageSummary, Manifes
 export * from './packet.ts';
 export * from './store.ts';
 export * from './router.ts';
+export * from './codec.ts';
