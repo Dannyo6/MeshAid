@@ -17,18 +17,19 @@ import java.security.spec.X509EncodedKeySpec
 /**
  * Binary Packet Representation for MeshAid BLE & Opportunistic Transport
  *
- * Wire format (Total Header: 89 bytes + N bytes payload):
- * - Version (1B)
- * - Priority Class (1B: P0-P3)
- * - Hop Count (2B, Big Endian)
- * - Message ID (8B SHA-256 slice)
- * - Timestamp (4B UInt32 seconds, Big Endian)
- * - TTL (4B UInt32 seconds, Big Endian)
- * - Latitude (4B IEEE 754 Float, NaN if null)
- * - Longitude (4B IEEE 754 Float, NaN if null)
- * - Payload Length (1B, 0..255)
- * - Ed25519 Signature (64B)
- * - Variable Payload (N bytes)
+ * Wire format (Total Header: 96 bytes + N bytes payload):
+ * - 00..01: Magic (2B: 0x4D, 0x41 / "MA")
+ * - 02: Version (1B)
+ * - 03: Priority Class (1B: P0-P3)
+ * - 04..05: Hop Count (2B, Big Endian)
+ * - 06..13: Message ID (8B SHA-256 slice)
+ * - 14..17: Timestamp (4B UInt32 seconds, Big Endian)
+ * - 18..21: TTL (4B UInt32 seconds, Big Endian)
+ * - 22..25: Latitude (4B IEEE 754 Float, NaN if null)
+ * - 26..29: Longitude (4B IEEE 754 Float, NaN if null)
+ * - 30..31: Payload Length (2B UInt16, Big Endian)
+ * - 32..95: Ed25519 Signature (64B)
+ * - 96..End: Variable Payload (N bytes)
  */
 data class MeshAidPacket(
     val version: Int = 1,
@@ -89,8 +90,12 @@ class PacketIntegrityException(message: String) : SecurityException(message)
 
 object MeshAidPacketCodec {
 
-    const val HEADER_SIZE = 93
-    const val MAX_PAYLOAD_SIZE = 255
+    const val FIXED_HEADER_SIZE = 96
+    const val HEADER_SIZE = FIXED_HEADER_SIZE
+    const val MAX_PAYLOAD_SIZE = 65535
+
+    const val MAGIC_BYTE_0: Byte = 0x4D.toByte() // 'M'
+    const val MAGIC_BYTE_1: Byte = 0x41.toByte() // 'A'
 
     // Standard ASN.1 prefix for 32-byte Ed25519 public keys to form X.509 DER
     private val ED25519_X509_PREFIX = byteArrayOf(
@@ -107,7 +112,7 @@ object MeshAidPacketCodec {
     }
 
     /**
-     * Serializes a MeshAidPacket into its canonical binary wire format
+     * Serializes a MeshAidPacket into its canonical binary wire format (96B Header + Payload)
      */
     fun encodePacket(packet: MeshAidPacket): ByteArray {
         require(packet.messageId.size == 8) { "Message ID must be exactly 8 bytes" }
@@ -116,17 +121,31 @@ object MeshAidPacketCodec {
             "Payload size exceeds $MAX_PAYLOAD_SIZE bytes (got ${packet.payload.size})"
         }
 
-        val buffer = ByteBuffer.allocate(HEADER_SIZE + packet.payload.size).order(ByteOrder.BIG_ENDIAN)
+        val buffer = ByteBuffer.allocate(FIXED_HEADER_SIZE + packet.payload.size).order(ByteOrder.BIG_ENDIAN)
+        // 00..01: Magic (2B)
+        buffer.put(MAGIC_BYTE_0)
+        buffer.put(MAGIC_BYTE_1)
+        // 02: Version (1B)
         buffer.put(packet.version.toByte())
+        // 03: Priority (1B)
         buffer.put(packet.priority.tier.toByte())
+        // 04..05: Hop Count (2B BE)
         buffer.putShort(packet.hopCount.toShort())
+        // 06..13: Message ID (8B)
         buffer.put(packet.messageId)
+        // 14..17: Timestamp (4B UInt32 BE)
         buffer.putInt((packet.timestampSeconds and 0xFFFFFFFFL).toInt())
+        // 18..21: TTL (4B UInt32 BE)
         buffer.putInt((packet.ttlSeconds and 0xFFFFFFFFL).toInt())
+        // 22..25: Lat (4B Float32 BE)
         buffer.putFloat(packet.latitude ?: Float.NaN)
+        // 26..29: Lng (4B Float32 BE)
         buffer.putFloat(packet.longitude ?: Float.NaN)
-        buffer.put(packet.payload.size.toByte())
+        // 30..31: Payload Length (2B UInt16 BE)
+        buffer.putShort((packet.payload.size and 0xFFFF).toShort())
+        // 32..95: Ed25519 Signature (64B)
         buffer.put(packet.signature)
+        // 96..End: Payload (variable bytes)
         buffer.put(packet.payload)
 
         return buffer.array()
@@ -149,39 +168,61 @@ object MeshAidPacketCodec {
         expectedChecksum: String? = null,
         publicKeyBytes: ByteArray? = null
     ): MeshAidPacket {
-        if (bytes.size < HEADER_SIZE) {
-            throw PacketIntegrityException("Packet length ${bytes.size} is less than minimum header size ($HEADER_SIZE)")
+        if (bytes.size < FIXED_HEADER_SIZE) {
+            throw PacketIntegrityException("Packet length ${bytes.size} is less than minimum header size ($FIXED_HEADER_SIZE)")
         }
 
         val buffer = ByteBuffer.wrap(bytes).order(ByteOrder.BIG_ENDIAN)
+
+        // 00..01: Magic (2B)
+        val magic0 = buffer.get()
+        val magic1 = buffer.get()
+        if (magic0 != MAGIC_BYTE_0 || magic1 != MAGIC_BYTE_1) {
+            throw PacketIntegrityException(
+                "Invalid packet magic bytes: expected [0x4D, 0x41] ('MA'), got [0x%02X, 0x%02X]".format(magic0, magic1)
+            )
+        }
+
+        // 02: Version (1B)
         val version = buffer.get().toInt() and 0xFF
         if (version != 1) {
             throw IllegalArgumentException("Unsupported protocol version: $version")
         }
 
+        // 03: Priority (1B)
         val priorityTier = buffer.get().toInt() and 0xFF
         val priority = Priority.values().firstOrNull { it.tier == priorityTier }
             ?: throw IllegalArgumentException("Invalid priority tier: $priorityTier")
 
+        // 04..05: Hop Count (2B BE)
         val hopCount = buffer.short.toInt() and 0xFFFF
 
+        // 06..13: Message ID (8B)
         val messageId = ByteArray(8)
         buffer.get(messageId)
 
+        // 14..17: Timestamp (4B UInt32 BE)
         val timestampSeconds = buffer.int.toLong() and 0xFFFFFFFFL
+
+        // 18..21: TTL (4B UInt32 BE)
         val ttlSeconds = buffer.int.toLong() and 0xFFFFFFFFL
 
+        // 22..25: Lat (4B Float32 BE)
         val rawLat = buffer.float
         val latitude = if (rawLat.isNaN()) null else rawLat
 
+        // 26..29: Lng (4B Float32 BE)
         val rawLng = buffer.float
         val longitude = if (rawLng.isNaN()) null else rawLng
 
-        val payloadLength = buffer.get().toInt() and 0xFF
+        // 30..31: Payload Length (2B UInt16 BE)
+        val payloadLength = buffer.short.toInt() and 0xFFFF
 
+        // 32..95: Ed25519 Signature (64B)
         val signature = ByteArray(64)
         buffer.get(signature)
 
+        // 96..End: Payload (variable bytes)
         val remainingBytes = buffer.remaining()
         if (remainingBytes != payloadLength) {
             throw PacketIntegrityException(
@@ -230,9 +271,12 @@ object MeshAidPacketCodec {
 
     /**
      * Collects all immutable packet fields into the byte array covered by Ed25519 signature
+     * (32B Header 00..31 + N bytes payload)
      */
     fun getSignableBytes(packet: MeshAidPacket): ByteArray {
-        val buffer = ByteBuffer.allocate(29 + packet.payload.size).order(ByteOrder.BIG_ENDIAN)
+        val buffer = ByteBuffer.allocate(32 + packet.payload.size).order(ByteOrder.BIG_ENDIAN)
+        buffer.put(MAGIC_BYTE_0)
+        buffer.put(MAGIC_BYTE_1)
         buffer.put(packet.version.toByte())
         buffer.put(packet.priority.tier.toByte())
         buffer.putShort(packet.hopCount.toShort())
@@ -241,7 +285,7 @@ object MeshAidPacketCodec {
         buffer.putInt((packet.ttlSeconds and 0xFFFFFFFFL).toInt())
         buffer.putFloat(packet.latitude ?: Float.NaN)
         buffer.putFloat(packet.longitude ?: Float.NaN)
-        buffer.put(packet.payload.size.toByte())
+        buffer.putShort((packet.payload.size and 0xFFFF).toShort())
         buffer.put(packet.payload)
         return buffer.array()
     }

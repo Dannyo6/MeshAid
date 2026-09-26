@@ -37,7 +37,11 @@ class MeshAidPacketCodecTest {
         )
 
         val encoded = MeshAidPacketCodec.encodePacket(originalPacket)
-        assertEquals(MeshAidPacketCodec.HEADER_SIZE + payload.size, encoded.size)
+        assertEquals(MeshAidPacketCodec.FIXED_HEADER_SIZE + payload.size, encoded.size)
+
+        // Verify magic bytes
+        assertEquals(MeshAidPacketCodec.MAGIC_BYTE_0, encoded[0])
+        assertEquals(MeshAidPacketCodec.MAGIC_BYTE_1, encoded[1])
 
         val decoded = MeshAidPacketCodec.decodePacket(encoded)
         assertEquals(originalPacket.version, decoded.version)
@@ -52,6 +56,79 @@ class MeshAidPacketCodecTest {
         assertEquals(lng, decoded.longitude!!, 0.0001f)
         assertArrayEquals(originalPacket.signature, decoded.signature)
         assertArrayEquals(originalPacket.payload, decoded.payload)
+    }
+
+    @Test
+    fun testMagicHeaderValidation() {
+        val packet = MeshAidPacket(
+            version = 1,
+            priority = Priority.GENERAL_INFO,
+            hopCount = 0,
+            messageId = ByteArray(8) { 0x01 },
+            timestampSeconds = 1716000000L,
+            ttlSeconds = 3600L,
+            payload = "{\"status\":\"ok\"}".toByteArray(Charsets.UTF_8)
+        )
+        val encoded = MeshAidPacketCodec.encodePacket(packet)
+
+        // Verify valid magic header at bytes 0 and 1
+        assertEquals(MeshAidPacketCodec.MAGIC_BYTE_0, encoded[0])
+        assertEquals(MeshAidPacketCodec.MAGIC_BYTE_1, encoded[1])
+
+        // Tamper with magic byte 0
+        val tamperedMagic0 = encoded.clone()
+        tamperedMagic0[0] = 0x00
+        var caughtMagic0 = false
+        try {
+            MeshAidPacketCodec.decodePacket(tamperedMagic0)
+        } catch (e: PacketIntegrityException) {
+            caughtMagic0 = true
+        }
+        assertTrue("Corrupted magic byte 0 must throw PacketIntegrityException", caughtMagic0)
+
+        // Tamper with magic byte 1
+        val tamperedMagic1 = encoded.clone()
+        tamperedMagic1[1] = 0x00
+        var caughtMagic1 = false
+        try {
+            MeshAidPacketCodec.decodePacket(tamperedMagic1)
+        } catch (e: PacketIntegrityException) {
+            caughtMagic1 = true
+        }
+        assertTrue("Corrupted magic byte 1 must throw PacketIntegrityException", caughtMagic1)
+    }
+
+    @Test
+    fun testBufferBoundaryChecks() {
+        assertEquals(96, MeshAidPacketCodec.FIXED_HEADER_SIZE)
+        assertEquals(96, MeshAidPacketCodec.HEADER_SIZE)
+
+        // Buffer smaller than 96 bytes (e.g. 95 bytes)
+        val truncated95 = ByteArray(95) { 0x00 }
+        truncated95[0] = MeshAidPacketCodec.MAGIC_BYTE_0
+        truncated95[1] = MeshAidPacketCodec.MAGIC_BYTE_1
+        var caughtTruncated = false
+        try {
+            MeshAidPacketCodec.decodePacket(truncated95)
+        } catch (e: PacketIntegrityException) {
+            caughtTruncated = true
+        }
+        assertTrue("Buffer of 95 bytes must throw PacketIntegrityException", caughtTruncated)
+
+        // Empty payload packet should have exact size of FIXED_HEADER_SIZE (96 bytes)
+        val emptyPayloadPacket = MeshAidPacket(
+            version = 1,
+            priority = Priority.GENERAL_INFO,
+            hopCount = 0,
+            messageId = ByteArray(8) { 0x02 },
+            timestampSeconds = 1716000000L,
+            ttlSeconds = 3600L,
+            payload = ByteArray(0)
+        )
+        val encodedEmpty = MeshAidPacketCodec.encodePacket(emptyPayloadPacket)
+        assertEquals(MeshAidPacketCodec.FIXED_HEADER_SIZE, encodedEmpty.size)
+        val decodedEmpty = MeshAidPacketCodec.decodePacket(encodedEmpty)
+        assertEquals(0, decodedEmpty.payload.size)
     }
 
     @Test
@@ -170,21 +247,21 @@ class MeshAidPacketCodecTest {
         val decoded = MeshAidPacketCodec.decodePacket(encoded, publicKeyBytes = publicKeyBytes)
         assertEquals(signedPacket.priority, decoded.priority)
 
-        // Tamper with packet payload
-        val tamperedBytes = encoded.clone()
-        tamperedBytes[tamperedBytes.size - 1] = (tamperedBytes[tamperedBytes.size - 1].toInt() xor 0x01).toByte()
+        // 1. Tamper with packet payload
+        val tamperedPayloadBytes = encoded.clone()
+        tamperedPayloadBytes[tamperedPayloadBytes.size - 1] =
+            (tamperedPayloadBytes[tamperedPayloadBytes.size - 1].toInt() xor 0x01).toByte()
 
-        var tamperedCaught = false
+        var tamperedPayloadCaught = false
         try {
-            MeshAidPacketCodec.decodePacket(tamperedBytes, publicKeyBytes = publicKeyBytes)
+            MeshAidPacketCodec.decodePacket(tamperedPayloadBytes, publicKeyBytes = publicKeyBytes)
         } catch (e: PacketIntegrityException) {
-            tamperedCaught = true
+            tamperedPayloadCaught = true
         }
-        assertTrue("Tampered payload should be rejected by signature verification", tamperedCaught)
+        assertTrue("Tampered payload should be rejected by signature verification", tamperedPayloadCaught)
 
-        // Tamper with signature directly
+        // 2. Tamper with signature directly (located at offset 32..95)
         val tamperedSigBytes = encoded.clone()
-        // Signature starts at offset 29
         tamperedSigBytes[35] = (tamperedSigBytes[35].toInt() xor 0x55).toByte()
 
         var sigTamperCaught = false
@@ -194,6 +271,18 @@ class MeshAidPacketCodecTest {
             sigTamperCaught = true
         }
         assertTrue("Tampered signature should be rejected", sigTamperCaught)
+
+        // 3. Tamper with header field (priority at offset 3)
+        val tamperedHeaderBytes = encoded.clone()
+        tamperedHeaderBytes[3] = Priority.CIVILIAN_SOS.tier.toByte()
+
+        var headerTamperCaught = false
+        try {
+            MeshAidPacketCodec.decodePacket(tamperedHeaderBytes, publicKeyBytes = publicKeyBytes)
+        } catch (e: PacketIntegrityException) {
+            headerTamperCaught = true
+        }
+        assertTrue("Tampered header field should be rejected by signature verification", headerTamperCaught)
     }
 
     @Test
@@ -251,8 +340,9 @@ class MeshAidPacketCodecTest {
             payload = byteArrayOf(1, 2, 3)
         )
         val encoded = MeshAidPacketCodec.encodePacket(packet)
-        // Alter payload length byte at offset 28
-        encoded[28] = 10 // declares 10 bytes, but only 3 exist
+        // Alter payload length at offset 30..31 (2B UInt16 BE)
+        encoded[30] = 0
+        encoded[31] = 10 // declares 10 bytes, but only 3 exist
         MeshAidPacketCodec.decodePacket(encoded)
     }
 }

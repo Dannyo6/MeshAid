@@ -2,25 +2,28 @@
  * Binary Wire Packet Codec & Ed25519 Cryptographic Verification Engine
  * Strictly compatible with MeshAid Android Packet Codec wire specification:
  *
- * Wire format (Total Header: 93 bytes + N bytes payload):
- * - Version (1B)
- * - Priority Class (1B: P0-P3)
- * - Hop Count (2B, Big Endian)
- * - Message ID (8B SHA-256 slice)
- * - Timestamp (4B UInt32 seconds, Big Endian)
- * - TTL (4B UInt32 seconds, Big Endian)
- * - Latitude (4B IEEE 754 Float, NaN if null)
- * - Longitude (4B IEEE 754 Float, NaN if null)
- * - Payload Length (1B, 0..255)
- * - Ed25519 Signature (64B)
- * - Variable Payload (N bytes)
+ * Wire format (Total Header: 96 bytes + N bytes payload):
+ * - 00..01: Magic (2B: 0x4D, 0x41 / "MA")
+ * - 02: Version (1B)
+ * - 03: Priority Class (1B: P0-P3)
+ * - 04..05: Hop Count (2B, Big Endian)
+ * - 06..13: Message ID (8B SHA-256 slice)
+ * - 14..17: Timestamp (4B UInt32 seconds, Big Endian)
+ * - 18..21: TTL (4B UInt32 seconds, Big Endian)
+ * - 22..25: Latitude (4B IEEE 754 Float, NaN if null)
+ * - 26..29: Longitude (4B IEEE 754 Float, NaN if null)
+ * - 30..31: Payload Length (2B UInt16, Big Endian)
+ * - 32..95: Ed25519 Signature (64B)
+ * - 96..End: Variable Payload (N bytes)
  */
 
 import crypto from 'node:crypto';
 import { Priority } from './types.ts';
 
-export const HEADER_SIZE = 93;
-export const MAX_PAYLOAD_SIZE = 255;
+export const MAGIC_BYTES = new Uint8Array([0x4d, 0x41]); // "MA"
+export const FIXED_HEADER_SIZE = 96;
+export const HEADER_SIZE = FIXED_HEADER_SIZE;
+export const MAX_PAYLOAD_SIZE = 65535;
 
 // Standard ASN.1 prefix for 32-byte Ed25519 public keys to form X.509 DER SubjectPublicKeyInfo (12 bytes)
 export const ED25519_SPKI_PREFIX = Buffer.from('302a300506032b6570032100', 'hex');
@@ -147,7 +150,7 @@ export function normalizeMessageId(id: string | Buffer): Buffer {
 
 /**
  * Collects the canonical signable bytes covered by the Ed25519 signature
- * (29 bytes header + N bytes payload)
+ * (32 bytes header 00..31 + N bytes payload)
  */
 export function getSignableBytes(packet: {
   version?: number;
@@ -174,23 +177,25 @@ export function getSignableBytes(packet: {
 
   const idBuf = normalizeMessageId(packet.messageId);
 
-  const buf = Buffer.alloc(29 + payloadBuf.length);
-  buf.writeUInt8(packet.version ?? 1, 0);
-  buf.writeUInt8(packet.priority, 1);
-  buf.writeUInt16BE(packet.hopCount ?? 0, 2);
-  idBuf.copy(buf, 4, 0, 8);
-  buf.writeUInt32BE(packet.timestampSeconds, 12);
-  buf.writeUInt32BE(packet.ttlSeconds, 16);
-  buf.writeFloatBE(packet.latitude != null ? packet.latitude : NaN, 20);
-  buf.writeFloatBE(packet.longitude != null ? packet.longitude : NaN, 24);
-  buf.writeUInt8(payloadBuf.length, 28);
-  payloadBuf.copy(buf, 29);
+  const buf = Buffer.alloc(32 + payloadBuf.length);
+  buf[0] = MAGIC_BYTES[0]; // 0x4D
+  buf[1] = MAGIC_BYTES[1]; // 0x41
+  buf.writeUInt8(packet.version ?? 1, 2);
+  buf.writeUInt8(packet.priority, 3);
+  buf.writeUInt16BE(packet.hopCount ?? 0, 4);
+  idBuf.copy(buf, 6, 0, 8);
+  buf.writeUInt32BE(packet.timestampSeconds, 14);
+  buf.writeUInt32BE(packet.ttlSeconds, 18);
+  buf.writeFloatBE(packet.latitude != null ? packet.latitude : NaN, 22);
+  buf.writeFloatBE(packet.longitude != null ? packet.longitude : NaN, 26);
+  buf.writeUInt16BE(payloadBuf.length, 30);
+  payloadBuf.copy(buf, 32);
 
   return buf;
 }
 
 /**
- * Serializes packet into binary wire format (93 bytes header + payload)
+ * Serializes packet into binary wire format (96 bytes header + payload)
  */
 export function encodeWirePacket(packet: EncodePacketOptions): Buffer {
   const version = packet.version ?? 1;
@@ -214,18 +219,20 @@ export function encodeWirePacket(packet: EncodePacketOptions): Buffer {
 
   const idBuf = normalizeMessageId(packet.messageId);
 
-  const buf = Buffer.alloc(HEADER_SIZE + payloadBuf.length);
-  buf.writeUInt8(version, 0);
-  buf.writeUInt8(packet.priority, 1);
-  buf.writeUInt16BE(hopCount, 2);
-  idBuf.copy(buf, 4, 0, 8);
-  buf.writeUInt32BE(packet.timestampSeconds, 12);
-  buf.writeUInt32BE(packet.ttlSeconds, 16);
-  buf.writeFloatBE(packet.latitude != null ? packet.latitude : NaN, 20);
-  buf.writeFloatBE(packet.longitude != null ? packet.longitude : NaN, 24);
-  buf.writeUInt8(payloadBuf.length, 28);
-  signature.copy(buf, 29, 0, 64);
-  payloadBuf.copy(buf, 93);
+  const buf = Buffer.alloc(FIXED_HEADER_SIZE + payloadBuf.length);
+  buf[0] = MAGIC_BYTES[0]; // 0x4D
+  buf[1] = MAGIC_BYTES[1]; // 0x41
+  buf.writeUInt8(version, 2);
+  buf.writeUInt8(packet.priority, 3);
+  buf.writeUInt16BE(hopCount, 4);
+  idBuf.copy(buf, 6, 0, 8);
+  buf.writeUInt32BE(packet.timestampSeconds, 14);
+  buf.writeUInt32BE(packet.ttlSeconds, 18);
+  buf.writeFloatBE(packet.latitude != null ? packet.latitude : NaN, 22);
+  buf.writeFloatBE(packet.longitude != null ? packet.longitude : NaN, 26);
+  buf.writeUInt16BE(payloadBuf.length, 30);
+  signature.copy(buf, 32, 0, 64);
+  payloadBuf.copy(buf, 96);
 
   return buf;
 }
@@ -257,48 +264,69 @@ export function decodeWirePacket(
 ): MeshAidWirePacket {
   const bytes = Buffer.isBuffer(rawBytes) ? rawBytes : Buffer.from(rawBytes);
 
-  if (bytes.length < HEADER_SIZE) {
+  if (bytes.length < FIXED_HEADER_SIZE) {
     throw new PacketIntegrityError(
-      `Packet length ${bytes.length} is less than minimum header size (${HEADER_SIZE})`
+      `Packet length ${bytes.length} is less than minimum header size (${FIXED_HEADER_SIZE})`
     );
   }
 
-  const version = bytes.readUInt8(0);
+  // 00..01: Magic
+  if (bytes[0] !== MAGIC_BYTES[0] || bytes[1] !== MAGIC_BYTES[1]) {
+    throw new PacketIntegrityError(
+      `Invalid magic bytes: expected [0x4d, 0x41] ('MA'), got [0x${bytes[0].toString(16)}, 0x${bytes[1].toString(16)}]`
+    );
+  }
+
+  // 02: Version
+  const version = bytes.readUInt8(2);
   if (version !== 1) {
     throw new PacketIntegrityError(`Unsupported protocol version: ${version}`);
   }
 
-  const priorityTier = bytes.readUInt8(1);
+  // 03: Priority
+  const priorityTier = bytes.readUInt8(3);
   if (priorityTier < 0 || priorityTier > 3) {
     throw new PacketIntegrityError(`Invalid priority tier: ${priorityTier}`);
   }
   const priority = priorityTier as Priority;
 
-  const hopCount = bytes.readUInt16BE(2);
-  const messageIdBytes = bytes.subarray(4, 12);
+  // 04..05: Hop Count
+  const hopCount = bytes.readUInt16BE(4);
+
+  // 06..13: Message ID
+  const messageIdBytes = bytes.subarray(6, 14);
   const messageId = messageIdBytes.toString('hex');
 
-  const timestampSeconds = bytes.readUInt32BE(12);
-  const ttlSeconds = bytes.readUInt32BE(16);
+  // 14..17: Timestamp
+  const timestampSeconds = bytes.readUInt32BE(14);
 
-  const rawLat = bytes.readFloatBE(20);
+  // 18..21: TTL
+  const ttlSeconds = bytes.readUInt32BE(18);
+
+  // 22..25: Lat
+  const rawLat = bytes.readFloatBE(22);
   const latitude = Number.isNaN(rawLat) ? null : rawLat;
 
-  const rawLng = bytes.readFloatBE(24);
+  // 26..29: Lng
+  const rawLng = bytes.readFloatBE(26);
   const longitude = Number.isNaN(rawLng) ? null : rawLng;
 
-  const payloadLength = bytes.readUInt8(28);
-  const signature = bytes.subarray(29, 93);
+  // 30..31: Payload Length
+  const payloadLength = bytes.readUInt16BE(30);
+
+  // 32..95: Ed25519 Signature (64B)
+  const signature = bytes.subarray(32, 96);
   const signatureHex = signature.toString('hex');
 
-  const remainingBytes = bytes.length - HEADER_SIZE;
+  // 96..End: Payload
+  const remainingBytes = bytes.length - FIXED_HEADER_SIZE;
   if (remainingBytes !== payloadLength) {
     throw new PacketIntegrityError(
       `Payload length mismatch: header declares ${payloadLength} bytes, but buffer contains ${remainingBytes} bytes`
     );
   }
 
-  const payload = bytes.subarray(93, 93 + payloadLength);
+  const payload = bytes.subarray(96, 96 + payloadLength);
 
   // Parse JSON payload if possible
   let payloadJson: Record<string, unknown> | null = null;
@@ -349,8 +377,8 @@ export function decodeWirePacket(
     }
 
     const keyObj = toPublicKeyObject(pubKey);
-    // Canonical signable bytes: 29 bytes header + payload
-    const signableBytes = Buffer.concat([bytes.subarray(0, 29), bytes.subarray(93)]);
+    // Canonical signable bytes: 32 bytes header (offsets 0..31) + payload (offset 96..)
+    const signableBytes = Buffer.concat([bytes.subarray(0, 32), bytes.subarray(96)]);
     const isValid = crypto.verify(null, signableBytes, keyObj, signature);
     if (!isValid) {
       throw new PacketIntegrityError(

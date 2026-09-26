@@ -4,6 +4,8 @@ import crypto from 'node:crypto';
 
 import {
   Priority,
+  MAGIC_BYTES,
+  FIXED_HEADER_SIZE,
   HEADER_SIZE,
   encodeWirePacket,
   decodeWirePacket,
@@ -12,8 +14,32 @@ import {
   ExpiredPacketError
 } from '../src/index.ts';
 
-describe('Wire Packet Codec & Ed25519 Cryptography', () => {
-  test('encodes and decodes signed wire packet with Ed25519 verification', () => {
+describe('Wire Packet Codec & Ed25519 Cryptography (96-Byte Framing)', () => {
+  test('validates the 96-byte header boundary and layout constants', () => {
+    assert.equal(FIXED_HEADER_SIZE, 96);
+    assert.equal(HEADER_SIZE, 96);
+    assert.deepEqual(Array.from(MAGIC_BYTES), [0x4d, 0x41]);
+
+    const timestampSeconds = Math.floor(Date.now() / 1000);
+    const ttlSeconds = 3600;
+
+    // Encoded packet with empty payload must equal exactly FIXED_HEADER_SIZE (96 bytes)
+    const emptyPayloadPacket = encodeWirePacket({
+      priority: Priority.GENERAL_INFO,
+      messageId: '0102030405060708',
+      timestampSeconds,
+      ttlSeconds,
+      payload: Buffer.alloc(0)
+    });
+
+    assert.equal(emptyPayloadPacket.length, FIXED_HEADER_SIZE);
+    assert.equal(emptyPayloadPacket[0], 0x4d); // 'M'
+    assert.equal(emptyPayloadPacket[1], 0x41); // 'A'
+    assert.equal(emptyPayloadPacket[2], 1);    // Version
+    assert.equal(emptyPayloadPacket[3], Priority.GENERAL_INFO); // Priority
+  });
+
+  test('encodes and decodes signed wire packet with Ed25519 verification round-trip', () => {
     const { publicKey, privateKey } = crypto.generateKeyPairSync('ed25519');
     const rawPub = publicKey.export({ type: 'spki', format: 'der' }).subarray(12);
 
@@ -41,7 +67,12 @@ describe('Wire Packet Codec & Ed25519 Cryptography', () => {
       privateKey
     );
 
-    assert.equal(encoded.length >= HEADER_SIZE, true);
+    const payloadLength = Buffer.from(JSON.stringify(payloadObj), 'utf8').length;
+    assert.equal(encoded.length, FIXED_HEADER_SIZE + payloadLength);
+
+    // Verify magic bytes in encoded frame
+    assert.equal(encoded[0], 0x4d); // 'M'
+    assert.equal(encoded[1], 0x41); // 'A'
 
     const decoded = decodeWirePacket(encoded);
     assert.equal(decoded.version, 1);
@@ -52,7 +83,49 @@ describe('Wire Packet Codec & Ed25519 Cryptography', () => {
     assert.equal(decoded.ttlSeconds, ttlSeconds);
     assert.ok(decoded.latitude !== null && Math.abs(decoded.latitude - 12.9716) < 0.001);
     assert.ok(decoded.longitude !== null && Math.abs(decoded.longitude - 77.5946) < 0.001);
+    assert.equal(decoded.payloadLength, payloadLength);
     assert.deepEqual(decoded.payloadJson, payloadObj);
+  });
+
+  test('rejects packets with invalid or corrupted magic bytes', () => {
+    const { privateKey } = crypto.generateKeyPairSync('ed25519');
+    const valid = signWirePacket(
+      {
+        priority: Priority.GENERAL_INFO,
+        messageId: '1234567812345678',
+        timestampSeconds: Math.floor(Date.now() / 1000),
+        ttlSeconds: 3600,
+        payload: { note: 'Magic test' }
+      },
+      privateKey
+    );
+
+    // Corrupt magic byte 0
+    const corrupted0 = Buffer.from(valid);
+    corrupted0[0] = 0x00;
+    assert.throws(
+      () => decodeWirePacket(corrupted0),
+      (err: Error) => err instanceof PacketIntegrityError && /magic/i.test(err.message)
+    );
+
+    // Corrupt magic byte 1
+    const corrupted1 = Buffer.from(valid);
+    corrupted1[1] = 0x00;
+    assert.throws(
+      () => decodeWirePacket(corrupted1),
+      (err: Error) => err instanceof PacketIntegrityError && /magic/i.test(err.message)
+    );
+  });
+
+  test('rejects packets smaller than the 96-byte header boundary', () => {
+    const truncated = Buffer.alloc(95); // 1 byte short of FIXED_HEADER_SIZE
+    truncated[0] = 0x4d;
+    truncated[1] = 0x41;
+
+    assert.throws(
+      () => decodeWirePacket(truncated),
+      (err: Error) => err instanceof PacketIntegrityError && /minimum header size/i.test(err.message)
+    );
   });
 
   test('rejects unsigned packet (all zeros signature)', () => {
@@ -104,7 +177,39 @@ describe('Wire Packet Codec & Ed25519 Cryptography', () => {
     );
   });
 
-  test('rejects expired packet', () => {
+  test('rejects tampered header fields (priority, timestamp, or signature)', () => {
+    const { publicKey, privateKey } = crypto.generateKeyPairSync('ed25519');
+    const rawPub = publicKey.export({ type: 'spki', format: 'der' }).subarray(12);
+
+    const encoded = signWirePacket(
+      {
+        priority: Priority.CIVILIAN_SOS, // 1
+        messageId: 'dddddddddddddddd',
+        timestampSeconds: Math.floor(Date.now() / 1000),
+        ttlSeconds: 3600,
+        payload: { text: 'Header tamper test', publicKey: rawPub.toString('hex') }
+      },
+      privateKey
+    );
+
+    // 1. Tamper with priority byte (offset 3)
+    const tamperedPriority = Buffer.from(encoded);
+    tamperedPriority[3] = Priority.EMERGENCY_AUTHORITY; // Alter 1 -> 0
+    assert.throws(
+      () => decodeWirePacket(tamperedPriority),
+      (err: Error) => err instanceof PacketIntegrityError && /tampered/i.test(err.message)
+    );
+
+    // 2. Tamper with signature byte (offset 32..95)
+    const tamperedSig = Buffer.from(encoded);
+    tamperedSig[35] ^= 0xff; // Invert bit in signature
+    assert.throws(
+      () => decodeWirePacket(tamperedSig),
+      (err: Error) => err instanceof PacketIntegrityError && /tampered/i.test(err.message)
+    );
+  });
+
+  test('rejects expired packet based on TTL', () => {
     const { publicKey, privateKey } = crypto.generateKeyPairSync('ed25519');
     const rawPub = publicKey.export({ type: 'spki', format: 'der' }).subarray(12);
 
