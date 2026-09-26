@@ -91,6 +91,20 @@ interface MeshAidDao {
     )
     suspend fun updateRelayStatus(messageId: String, isRelayed: Boolean = true)
 
+    // ─── Cloud Gateway Sync ───────────────────────────────────────────────────
+
+    /**
+     * Retrieves up to [limit] un-synced messages ordered by (priority ASC, createdAt DESC).
+     */
+    @Query("SELECT * FROM mesh_messages WHERE isSynced = 0 ORDER BY priority ASC, createdAt DESC LIMIT :limit")
+    fun getUnsyncedMessages(limit: Int = 50): List<MeshAidMessageEntity>
+
+    /**
+     * Marks messages as synced to the edge-to-cloud gateway.
+     */
+    @Query("UPDATE mesh_messages SET isSynced = 1 WHERE messageId IN (:messageIds)")
+    suspend fun markAsSynced(messageIds: List<String>)
+
     // ─── Expiry Pruning ───────────────────────────────────────────────────────
 
     /**

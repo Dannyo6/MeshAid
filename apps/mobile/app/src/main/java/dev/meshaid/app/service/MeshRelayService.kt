@@ -7,6 +7,10 @@ import android.app.Service
 import android.content.Context
 import android.content.Intent
 import android.content.pm.ServiceInfo
+import android.net.ConnectivityManager
+import android.net.Network
+import android.net.NetworkCapabilities
+import android.net.NetworkRequest
 import android.os.Binder
 import android.os.Build
 import android.os.IBinder
@@ -19,6 +23,7 @@ import dev.meshaid.app.data.MeshAidRepository
 import dev.meshaid.app.data.MeshAidRepository.IngestResult
 import dev.meshaid.app.data.local.MeshAidDatabase
 import dev.meshaid.app.data.local.entity.MeshAidMessageEntity
+import dev.meshaid.app.net.GatewaySyncManager
 import dev.meshaid.app.protocol.MeshAidPacket
 import dev.meshaid.app.protocol.MeshAidPacketCodec
 import kotlinx.coroutines.CoroutineScope
@@ -72,6 +77,9 @@ class MeshRelayService : Service() {
     private lateinit var advertiserManager: BleAdvertiserManager
     private lateinit var scannerManager: BleScannerManager
     private lateinit var repository: MeshAidRepository
+    private lateinit var gatewaySyncManager: GatewaySyncManager
+    private var connectivityManager: ConnectivityManager? = null
+    private var networkCallback: ConnectivityManager.NetworkCallback? = null
     private var wakeLock: PowerManager.WakeLock? = null
 
     private val _relayedPacketsFlow = MutableSharedFlow<MeshAidPacket>(extraBufferCapacity = 64)
@@ -81,6 +89,7 @@ class MeshRelayService : Service() {
 
     inner class LocalBinder : Binder() {
         fun getService(): MeshRelayService = this@MeshRelayService
+        fun getGatewaySyncManager(): GatewaySyncManager = gatewaySyncManager
     }
 
     override fun onCreate() {
@@ -88,9 +97,10 @@ class MeshRelayService : Service() {
         Log.i(TAG, "Initializing MeshRelayService (Phase 3 – Room-backed)")
         _isServiceRunning.value = true
 
-        // Wire up Room-backed repository
+        // Wire up Room-backed repository & Gateway Sync Manager
         val db = MeshAidDatabase.getInstance(applicationContext)
         repository = MeshAidRepository(db.meshAidDao())
+        gatewaySyncManager = GatewaySyncManager(db.meshAidDao())
 
         advertiserManager = BleAdvertiserManager(this)
         scannerManager = BleScannerManager(this)
@@ -101,6 +111,7 @@ class MeshRelayService : Service() {
 
         setupInboundPacketHandling()
         startCyclicAdvertisingLoop()
+        registerNetworkCallback()
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -303,6 +314,54 @@ class MeshRelayService : Service() {
         }
     }
 
+    // ─── Network Connectivity & Gateway Sync ─────────────────────────────────
+
+    private fun registerNetworkCallback() {
+        try {
+            connectivityManager = getSystemService(Context.CONNECTIVITY_SERVICE) as? ConnectivityManager
+            val networkRequest = NetworkRequest.Builder()
+                .addCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
+                .build()
+
+            networkCallback = object : ConnectivityManager.NetworkCallback() {
+                override fun onAvailable(network: Network) {
+                    Log.i(TAG, "Network connectivity with INTERNET acquired. Triggering gateway sync...")
+                    serviceScope.launch(Dispatchers.IO) {
+                        try {
+                            val syncedCount = gatewaySyncManager.syncPendingMessages()
+                            if (syncedCount > 0) {
+                                Log.i(TAG, "Gateway sync completed: $syncedCount packets uploaded")
+                            }
+                        } catch (e: Exception) {
+                            Log.e(TAG, "Error during automatic gateway sync: ${e.message}", e)
+                        }
+                    }
+                }
+            }
+
+            networkCallback?.let { callback ->
+                connectivityManager?.registerNetworkCallback(networkRequest, callback)
+                Log.i(TAG, "Registered NetworkCallback for NET_CAPABILITY_INTERNET")
+            }
+        } catch (e: Exception) {
+            Log.w(TAG, "Failed to register NetworkCallback: ${e.message}")
+        }
+    }
+
+    private fun unregisterNetworkCallback() {
+        try {
+            networkCallback?.let { callback ->
+                connectivityManager?.unregisterNetworkCallback(callback)
+                Log.i(TAG, "Unregistered NetworkCallback")
+            }
+        } catch (e: Exception) {
+            Log.w(TAG, "Error unregistering NetworkCallback: ${e.message}")
+        } finally {
+            networkCallback = null
+            connectivityManager = null
+        }
+    }
+
     // ─── Lifecycle ────────────────────────────────────────────────────────────
 
     override fun onDestroy() {
@@ -312,6 +371,7 @@ class MeshRelayService : Service() {
         serviceScope.cancel()
         scannerManager.stopScan()
         advertiserManager.stopAdvertising()
+        unregisterNetworkCallback()
         releaseWakeLock()
     }
 }

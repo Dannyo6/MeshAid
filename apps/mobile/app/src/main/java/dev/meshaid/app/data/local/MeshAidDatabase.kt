@@ -30,7 +30,7 @@ import dev.meshaid.app.data.local.entity.SeenPacketEntity
  */
 @Database(
     entities = [MeshAidMessageEntity::class, SeenPacketEntity::class],
-    version = 1,
+    version = 2,
     exportSchema = false  // TODO: enable exportSchema + schemaLocation before production migrations
 )
 abstract class MeshAidDatabase : RoomDatabase() {

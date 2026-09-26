@@ -83,6 +83,24 @@ class FakeMeshAidDao : MeshAidDao {
         }
     }
 
+    // ─── Cloud Gateway Sync ───────────────────────────────────────────────────
+
+    override fun getUnsyncedMessages(limit: Int): List<MeshAidMessageEntity> =
+        messages.value.values
+            .filter { !it.isSynced }
+            .sortedWith(compareBy<MeshAidMessageEntity> { it.priority }.thenByDescending { it.createdAt })
+            .take(limit)
+
+    override suspend fun markAsSynced(messageIds: List<String>) {
+        if (messageIds.isEmpty()) return
+        val idSet = messageIds.toSet()
+        messages.update { current ->
+            current.mapValues { (id, entity) ->
+                if (id in idSet) entity.copy(isSynced = true) else entity
+            }
+        }
+    }
+
     // ─── Expiry Pruning ───────────────────────────────────────────────────────
 
     override suspend fun deleteExpiredMessages(currentTimestampSeconds: Long): Int {

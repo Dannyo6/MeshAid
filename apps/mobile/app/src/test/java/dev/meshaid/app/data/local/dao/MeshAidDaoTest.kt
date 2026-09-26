@@ -48,6 +48,7 @@ class MeshAidDaoTest {
         priority: Int = 1,
         ttlOffset: Long = 300L,          // seconds from now (positive = future)
         isRelayed: Boolean = false,
+        isSynced: Boolean = false,
         createdAtOffset: Long = 0L       // millis offset from now (negative = older)
     ): MeshAidMessageEntity {
         val now = System.currentTimeMillis()
@@ -60,7 +61,8 @@ class MeshAidDaoTest {
             latitude = 0f,
             longitude = 0f,
             rawPacket = id.toByteArray(),
-            isRelayed = isRelayed
+            isRelayed = isRelayed,
+            isSynced = isSynced
         )
     }
 
@@ -234,5 +236,60 @@ class MeshAidDaoTest {
         dao.insertMessage(message("m2"))
 
         assertEquals(2, dao.observePendingCount().first())
+    }
+
+    // ─── Cloud Gateway Sync ───────────────────────────────────────────────────
+
+    @Test
+    fun `getUnsyncedMessages returns only unsynced messages ordered by priority ASC and createdAt DESC`() = runTest {
+        dao.insertMessage(message("synced", priority = 0, isSynced = true))
+        dao.insertMessage(message("p3-unsynced", priority = 3, isSynced = false, createdAtOffset = -5_000))
+        dao.insertMessage(message("p0-old-unsynced", priority = 0, isSynced = false, createdAtOffset = -2_000))
+        dao.insertMessage(message("p0-new-unsynced", priority = 0, isSynced = false, createdAtOffset = 0))
+
+        val unsynced = dao.getUnsyncedMessages(50)
+
+        assertEquals(3, unsynced.size)
+        assertEquals("p0-new-unsynced", unsynced[0].messageId)
+        assertEquals("p0-old-unsynced", unsynced[1].messageId)
+        assertEquals("p3-unsynced", unsynced[2].messageId)
+        assertFalse(unsynced.any { it.messageId == "synced" })
+    }
+
+    @Test
+    fun `getUnsyncedMessages respects limit`() = runTest {
+        repeat(5) { i ->
+            dao.insertMessage(message("msg-$i", priority = i, isSynced = false))
+        }
+
+        val limited = dao.getUnsyncedMessages(limit = 2)
+
+        assertEquals(2, limited.size)
+        assertEquals("msg-0", limited[0].messageId)
+        assertEquals("msg-1", limited[1].messageId)
+    }
+
+    @Test
+    fun `markAsSynced marks specified message IDs as synced`() = runTest {
+        dao.insertMessage(message("m1", isSynced = false))
+        dao.insertMessage(message("m2", isSynced = false))
+        dao.insertMessage(message("m3", isSynced = false))
+
+        assertEquals(3, dao.getUnsyncedMessages().size)
+
+        dao.markAsSynced(listOf("m1", "m3"))
+
+        val remainingUnsynced = dao.getUnsyncedMessages()
+        assertEquals(1, remainingUnsynced.size)
+        assertEquals("m2", remainingUnsynced[0].messageId)
+    }
+
+    @Test
+    fun `markAsSynced with empty list is no-op`() = runTest {
+        dao.insertMessage(message("m1", isSynced = false))
+
+        dao.markAsSynced(emptyList())
+
+        assertEquals(1, dao.getUnsyncedMessages().size)
     }
 }

@@ -13,7 +13,8 @@ import androidx.room.PrimaryKey
     indices = [
         Index(value = ["priority", "createdAt"]),
         Index(value = ["ttl"]),
-        Index(value = ["isRelayed"])
+        Index(value = ["isRelayed"]),
+        Index(value = ["isSynced"])
     ]
 )
 data class MeshAidMessageEntity(
@@ -27,7 +28,8 @@ data class MeshAidMessageEntity(
     val longitude: Float = Float.NaN,
     @ColumnInfo(typeAffinity = ColumnInfo.BLOB)
     val rawPacket: ByteArray,
-    val isRelayed: Boolean = false
+    val isRelayed: Boolean = false,
+    val isSynced: Boolean = false
 ) {
     /** Alias property for raw wire bytes */
     val wireBytes: ByteArray
@@ -46,6 +48,7 @@ data class MeshAidMessageEntity(
         if (longitude != other.longitude) return false
         if (!rawPacket.contentEquals(other.rawPacket)) return false
         if (isRelayed != other.isRelayed) return false
+        if (isSynced != other.isSynced) return false
 
         return true
     }
@@ -60,6 +63,7 @@ data class MeshAidMessageEntity(
         result = 31 * result + longitude.hashCode()
         result = 31 * result + rawPacket.contentHashCode()
         result = 31 * result + isRelayed.hashCode()
+        result = 31 * result + isSynced.hashCode()
         return result
     }
 }
