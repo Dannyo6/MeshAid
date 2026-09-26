@@ -12,6 +12,7 @@ import dev.meshaid.app.data.local.entity.MeshAidMessageEntity
  * @property isDispatchDialogOpen Whether the SOS Dispatch dialog is currently visible.
  * @property isBroadcasting Whether an emergency broadcast is currently in-flight.
  * @property userFeedbackMessage Transient status message or error to display to the user.
+ * @property isBatteryOptimizationIgnored Whether the application is exempt from Android Doze / battery optimizations.
  */
 data class EmergencyUiState(
     val activeRelayCount: Int = 0,
@@ -20,5 +21,6 @@ data class EmergencyUiState(
     val recentBulletins: List<MeshAidMessageEntity> = emptyList(),
     val isDispatchDialogOpen: Boolean = false,
     val isBroadcasting: Boolean = false,
-    val userFeedbackMessage: String? = null
+    val userFeedbackMessage: String? = null,
+    val isBatteryOptimizationIgnored: Boolean = true
 )

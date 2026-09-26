@@ -17,6 +17,7 @@ class EmergencyUiStateTest {
         assertTrue(state.recentBulletins.isEmpty())
         assertFalse(state.isDispatchDialogOpen)
         assertFalse(state.isBroadcasting)
+        assertTrue(state.isBatteryOptimizationIgnored)
     }
 
     @Test
@@ -33,7 +34,8 @@ class EmergencyUiStateTest {
             seenPacketsCount = 12,
             isServiceRunning = true,
             recentBulletins = listOf(dummyEntity),
-            isDispatchDialogOpen = true
+            isDispatchDialogOpen = true,
+            isBatteryOptimizationIgnored = false
         )
 
         assertEquals(3, state.activeRelayCount)
@@ -41,5 +43,6 @@ class EmergencyUiStateTest {
         assertTrue(state.isServiceRunning)
         assertEquals(1, state.recentBulletins.size)
         assertTrue(state.isDispatchDialogOpen)
+        assertFalse(state.isBatteryOptimizationIgnored)
     }
 }

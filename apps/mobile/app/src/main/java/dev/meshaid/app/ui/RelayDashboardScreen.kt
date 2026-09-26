@@ -17,6 +17,9 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import android.app.Activity
+import android.content.Context
+import android.content.ContextWrapper
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -39,6 +42,9 @@ import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Security
 import androidx.compose.material.icons.filled.Sensors
 import androidx.compose.material.icons.filled.Share
+import androidx.compose.material.icons.filled.Warning
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExtendedFloatingActionButton
@@ -64,6 +70,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
+import dev.meshaid.app.util.BatteryOptimizationHelper
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
@@ -105,6 +113,8 @@ fun RelayDashboardScreen(
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val snackbarHostState = remember { SnackbarHostState() }
+    val context = LocalContext.current
+    val activity = remember(context) { context.findActivity() }
 
     LaunchedEffect(uiState.userFeedbackMessage) {
         uiState.userFeedbackMessage?.let { msg ->
@@ -141,6 +151,17 @@ fun RelayDashboardScreen(
                 isServiceRunning = uiState.isServiceRunning,
                 onToggleService = { viewModel.toggleRelayService() }
             )
+
+            // OEM Background Restriction Warning Banner
+            AnimatedVisibility(visible = !uiState.isBatteryOptimizationIgnored) {
+                BatteryOptimizationWarningCard(
+                    onExemptClick = {
+                        activity?.let {
+                            BatteryOptimizationHelper.requestIgnoreBatteryOptimizations(it)
+                        }
+                    }
+                )
+            }
 
             // Real-time telemetry metrics cards
             TelemetryCardsRow(
@@ -689,3 +710,87 @@ private fun EmptyBulletinsPlaceholder(isServiceRunning: Boolean) {
         }
     }
 }
+
+/**
+ * Tactical banner warning the operator when OEM power savers or Android Doze mode
+ * threaten background store-carry-forward BLE message propagation.
+ */
+@Composable
+fun BatteryOptimizationWarningCard(
+    onExemptClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Card(
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 6.dp),
+        shape = RoundedCornerShape(12.dp),
+        colors = CardDefaults.cardColors(containerColor = Color(0xFF3B1515)),
+        border = BorderStroke(1.dp, Color(0xFFDC2626).copy(alpha = 0.7f))
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(14.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(42.dp)
+                    .clip(CircleShape)
+                    .background(Color(0xFFEF4444).copy(alpha = 0.2f)),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Warning,
+                    contentDescription = null,
+                    tint = Color(0xFFF87171),
+                    modifier = Modifier.size(24.dp)
+                )
+            }
+
+            Spacer(modifier = Modifier.width(12.dp))
+
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = "Background Execution Restricted",
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.Bold,
+                    color = Color(0xFFFCA5A5)
+                )
+                Spacer(modifier = Modifier.height(2.dp))
+                Text(
+                    text = "Android Doze or OEM power savers may suspend mesh relaying when screen is off.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = Slate300,
+                    lineHeight = 16.sp
+                )
+            }
+
+            Spacer(modifier = Modifier.width(10.dp))
+
+            Button(
+                onClick = onExemptClick,
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = Color(0xFFEF4444),
+                    contentColor = Color.White
+                ),
+                shape = RoundedCornerShape(8.dp),
+                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp)
+            ) {
+                Text(
+                    text = "Exempt App",
+                    style = MaterialTheme.typography.labelMedium,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+        }
+    }
+}
+
+private tailrec fun Context.findActivity(): Activity? = when (this) {
+    is Activity -> this
+    is ContextWrapper -> baseContext.findActivity()
+    else -> null
+}
+

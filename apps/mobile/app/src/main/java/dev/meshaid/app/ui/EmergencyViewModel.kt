@@ -15,6 +15,7 @@ import dev.meshaid.app.data.MeshAidRepository.IngestResult
 import dev.meshaid.app.data.local.MeshAidDatabase
 import dev.meshaid.app.domain.models.Priority
 import dev.meshaid.app.service.MeshRelayService
+import dev.meshaid.app.util.BatteryOptimizationHelper
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -45,6 +46,7 @@ class EmergencyViewModel(
     private val isDispatchDialogOpen = MutableStateFlow(false)
     private val isBroadcasting = MutableStateFlow(false)
     private val userFeedbackMessage = MutableStateFlow<String?>(null)
+    private val isBatteryOptimizationIgnored = MutableStateFlow(true)
 
     // Bound service instance
     private var relayService: MeshRelayService? = null
@@ -68,6 +70,8 @@ class EmergencyViewModel(
     init {
         // Attempt binding if service is already running
         bindToRelayService()
+        // Evaluate OEM battery optimization exemption status on initialization
+        refreshBatteryStatus()
     }
 
     private data class TelemetryData(
@@ -87,14 +91,15 @@ class EmergencyViewModel(
     }
 
     /**
-     * Unified UI State combining telemetry from Room database and relay service.
+     * Unified UI State combining telemetry from Room database, relay service, and battery status.
      */
     val uiState: StateFlow<EmergencyUiState> = combine(
         telemetryFlow,
         isDispatchDialogOpen,
         isBroadcasting,
-        userFeedbackMessage
-    ) { telemetry, dialogOpen, broadcasting, feedback ->
+        userFeedbackMessage,
+        isBatteryOptimizationIgnored
+    ) { telemetry, dialogOpen, broadcasting, feedback, batteryIgnored ->
         EmergencyUiState(
             activeRelayCount = telemetry.pendingCount,
             seenPacketsCount = telemetry.seenCount,
@@ -102,13 +107,23 @@ class EmergencyViewModel(
             recentBulletins = telemetry.recentBulletins,
             isDispatchDialogOpen = dialogOpen,
             isBroadcasting = broadcasting,
-            userFeedbackMessage = feedback
+            userFeedbackMessage = feedback,
+            isBatteryOptimizationIgnored = batteryIgnored
         )
     }.stateIn(
         scope = viewModelScope,
         started = SharingStarted.WhileSubscribed(5000L),
         initialValue = EmergencyUiState()
     )
+
+    /**
+     * Refreshes the battery optimization exemption status from the system.
+     * Should be called on activity resume or after the user interacts with the exemption dialog.
+     */
+    fun refreshBatteryStatus() {
+        val ignored = BatteryOptimizationHelper.isIgnoringBatteryOptimizations(context)
+        isBatteryOptimizationIgnored.value = ignored
+    }
 
     // ─── Service Controls ─────────────────────────────────────────────────────
 

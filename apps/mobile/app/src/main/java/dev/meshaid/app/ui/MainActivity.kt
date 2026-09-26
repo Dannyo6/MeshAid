@@ -59,6 +59,8 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    private var emergencyViewModel: EmergencyViewModel? = null
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
@@ -69,6 +71,7 @@ class MainActivity : ComponentActivity() {
                     color = Slate950
                 ) {
                     val viewModel: EmergencyViewModel = viewModel()
+                    emergencyViewModel = viewModel
 
                     RequestPermissionsEffect()
 
@@ -76,6 +79,11 @@ class MainActivity : ComponentActivity() {
                 }
             }
         }
+    }
+
+    override fun onResume() {
+        super.onResume()
+        emergencyViewModel?.refreshBatteryStatus()
     }
 
     @Composable
