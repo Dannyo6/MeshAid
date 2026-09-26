@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
+import { TacticalMap } from './components/TacticalMap';
 import styles from './App.module.css';
 
 /**
@@ -181,6 +182,8 @@ export function App() {
   const [selectedFilter, setSelectedFilter] = useState<'ALL' | number>('ALL');
   const [searchQuery, setSearchQuery] = useState('');
   const [sortMode, setSortMode] = useState<'PRIORITY_CHRONO' | 'PURE_CHRONO'>('PRIORITY_CHRONO');
+  const [viewMode, setViewMode] = useState<'SPLIT' | 'FEED_ONLY' | 'MAP_ONLY'>('SPLIT');
+  const [selectedIncidentId, setSelectedIncidentId] = useState<string | null>(null);
   const [expandedPayloadIds, setExpandedPayloadIds] = useState<Set<string>>(new Set());
   const [copiedId, setCopiedId] = useState<string | null>(null);
 
@@ -779,220 +782,289 @@ export function App() {
               <option value="PRIORITY_CHRONO">Prioritized (P0 → P3)</option>
               <option value="PURE_CHRONO">Chronological (Newest First)</option>
             </select>
-          </div>
-        </section>
 
-        {/* ── Live Incident Feed ── */}
-        <section className={styles.feedSection}>
-          <div className={styles.feedHeader}>
-            <div className={styles.feedTitleGroup}>
-              <h2 className={styles.feedTitle}>Live Incident Feed</h2>
-              <div className={styles.liveBeacon}>
-                <span className={styles.liveBeaconDot} />
-                REAL-TIME STREAM
-              </div>
-            </div>
-            <span className={styles.feedCountBadge}>
-              Showing {displayedIncidents.length} of {totalIncidents} Transmissions
-            </span>
-          </div>
-
-          {displayedIncidents.length === 0 ? (
-            <div className={styles.emptyFeed}>
-              <div className={styles.emptyRadarAnim} />
-              <div className={styles.emptyTitle}>No Emergency Transmissions in Queue</div>
-              <p className={styles.emptyDesc}>
-                Listening on opportunistic BLE gateway synchronization channel. Transmissions
-                relayed via store-carry-forward nodes will stream here automatically.
-              </p>
+            {/* Map View Mode Toggle */}
+            <div className={styles.viewToggleGroup}>
               <button
                 type="button"
-                className={`${styles.btnIcon} ${styles.btnSimulate}`}
-                onClick={() => simulateInboundIncident()}
+                className={`${styles.viewToggleBtn} ${
+                  viewMode === 'SPLIT' ? styles.viewToggleBtnActive : ''
+                }`}
+                onClick={() => setViewMode('SPLIT')}
+                title="Split View (Incident Feed + Tactical Map)"
               >
-                Simulate Inbound Transmission
+                <span>◫</span> Split
+              </button>
+              <button
+                type="button"
+                className={`${styles.viewToggleBtn} ${
+                  viewMode === 'FEED_ONLY' ? styles.viewToggleBtnActive : ''
+                }`}
+                onClick={() => setViewMode('FEED_ONLY')}
+                title="Incident Feed Only"
+              >
+                <span>☰</span> Feed
+              </button>
+              <button
+                type="button"
+                className={`${styles.viewToggleBtn} ${
+                  viewMode === 'MAP_ONLY' ? styles.viewToggleBtnActive : ''
+                }`}
+                onClick={() => setViewMode('MAP_ONLY')}
+                title="Tactical Map Only"
+              >
+                <span>🗺️</span> Map
               </button>
             </div>
-          ) : (
-            <div className={styles.incidentList}>
-              {displayedIncidents.map((incident) => {
-                const payloadObj = parsePayload(incident.payload);
-                const details = extractDetails(payloadObj);
-                const category = extractCategory(payloadObj, incident.priority);
-                const headcount = extractHeadcount(payloadObj);
-                const isExpanded = expandedPayloadIds.has(incident.messageId);
-                const isCopied = copiedId === incident.messageId;
+          </div>
+        </section>
 
-                // Priority card border style
-                const priorityClass =
-                  incident.priority === Priority.EMERGENCY_AUTHORITY
-                    ? styles.cardPriorityP0
-                    : incident.priority === Priority.CIVILIAN_SOS
-                      ? styles.cardPriorityP1
-                      : incident.priority === Priority.RESOURCE_LOGISTICS
-                        ? styles.cardPriorityP2
-                        : styles.cardPriorityP3;
-
-                return (
-                  <article
-                    key={incident.messageId}
-                    className={`${styles.incidentCard} ${priorityClass}`}
-                  >
-                    {/* Top Row: Triage Tag + Security Badge + Timestamps */}
-                    <div className={styles.cardHeaderRow}>
-                      <div className={styles.cardHeaderBadges}>
-                        {/* Triage Tag */}
-                        {incident.priority === Priority.EMERGENCY_AUTHORITY && (
-                          <span className={styles.triageP0}>
-                            ⚠️ P0 AUTHORITY ALERT
-                          </span>
-                        )}
-                        {incident.priority === Priority.CIVILIAN_SOS && (
-                          <span className={styles.triageP1}>
-                            🚨 P1 CRITICAL SOS
-                          </span>
-                        )}
-                        {incident.priority === Priority.RESOURCE_LOGISTICS && (
-                          <span className={styles.triageP2}>
-                            📦 P2 SUPPLIES REQUEST
-                          </span>
-                        )}
-                        {incident.priority === Priority.GENERAL_INFO && (
-                          <span className={styles.triageP3}>
-                            ℹ️ P3 GENERAL INFO
-                          </span>
-                        )}
-
-                        {/* Cryptographic Security Badge */}
-                        <span
-                          className={styles.securityBadge}
-                          title="Decoded from Ed25519 digitally signed wire frame. Cryptographic authenticity validated by gateway."
-                        >
-                          <span className={styles.securityBadgeIcon}>🛡️</span>
-                          Ed25519 Cryptographically Verified
-                        </span>
-                      </div>
-
-                      {/* Timestamp */}
-                      <div className={styles.timestampGroup}>
-                        <span className={styles.timeRelative}>
-                          {formatRelativeTime(incident.timestamp)}
-                        </span>
-                        <span>•</span>
-                        <span className={styles.timeUtc}>
-                          {formatUtcTime(incident.timestamp)}
-                        </span>
-                      </div>
-                    </div>
-
-                    {/* Card Body: Category, Headcount, Situational Details */}
-                    <div className={styles.cardBody}>
-                      <div className={styles.payloadHeaderRow}>
-                        <span className={styles.categoryTag}>{category}</span>
-
-                        {headcount !== null && (
-                          <span className={styles.headcountBadge}>
-                            <span>👥</span>
-                            <span>Headcount:</span>
-                            <span className={styles.headcountValue}>{headcount}</span>
-                            <span>Victim{headcount > 1 ? 's' : ''} at Risk</span>
-                          </span>
-                        )}
-                      </div>
-
-                      <p className={styles.situationalNotes}>{details}</p>
-                    </div>
-
-                    {/* Packet Telemetry Data Grid */}
-                    <div className={styles.telemetryGrid}>
-                      {/* Message ID Slice */}
-                      <div className={styles.telemetryItem}>
-                        <span className={styles.telemetryKey}>Message ID</span>
-                        <span className={styles.telemetryValue}>
-                          #{incident.messageId.slice(0, 8)}...
-                          <button
-                            type="button"
-                            className={styles.copyBtn}
-                            onClick={() => copyMessageId(incident.messageId)}
-                            title="Copy full message ID"
-                          >
-                            {isCopied ? '✓ Copied' : '📋'}
-                          </button>
-                        </span>
-                      </div>
-
-                      {/* Hop Count */}
-                      <div className={styles.telemetryItem}>
-                        <span className={styles.telemetryKey}>Relay Hops</span>
-                        <span className={styles.telemetryValue}>
-                          🔀 {incident.hopCount} {incident.hopCount === 1 ? 'Hop' : 'Hops'}
-                        </span>
-                      </div>
-
-                      {/* Epoch Timestamp */}
-                      <div className={styles.telemetryItem}>
-                        <span className={styles.telemetryKey}>Epoch Timestamp</span>
-                        <span className={styles.telemetryValue}>
-                          ⏱️ {formatEpoch(incident.timestamp)}
-                        </span>
-                      </div>
-
-                      {/* Lat / Lng Coordinates */}
-                      <div className={styles.telemetryItem}>
-                        <span className={styles.telemetryKey}>GPS Coordinates</span>
-                        <span className={styles.telemetryValue}>
-                          {incident.lat !== null && incident.lng !== null ? (
-                            <a
-                              href={`https://www.openstreetmap.org/?mlat=${incident.lat}&mlon=${incident.lng}#map=16/${incident.lat}/${incident.lng}`}
-                              target="_blank"
-                              rel="noreferrer"
-                              className={styles.coordLink}
-                              title="View GPS fix on OpenStreetMap"
-                            >
-                              📍 {Number(incident.lat).toFixed(4)}°, {Number(incident.lng).toFixed(4)}° ↗
-                            </a>
-                          ) : (
-                            <span style={{ color: '#64748b' }}>📍 GPS Offline</span>
-                          )}
-                        </span>
-                      </div>
-                    </div>
-
-                    {/* Expandable Raw Payload Inspector */}
-                    <button
-                      type="button"
-                      className={styles.rawDetailsToggle}
-                      onClick={() => togglePayloadExpand(incident.messageId)}
-                    >
-                      {isExpanded ? '▲ Hide Raw Wire Data' : '▼ Inspect Wire Payload JSON'}
-                    </button>
-
-                    {isExpanded && (
-                      <pre className={styles.rawPayloadBox}>
-                        {JSON.stringify(
-                          {
-                            messageId: incident.messageId,
-                            priority: incident.priority,
-                            hopCount: incident.hopCount,
-                            timestamp: incident.timestamp,
-                            lat: incident.lat,
-                            lng: incident.lng,
-                            receivedAt: incident.receivedAt,
-                            payload: payloadObj,
-                            signatureVerified: true,
-                            cryptoAlgorithm: 'Ed25519-SHA512',
-                          },
-                          null,
-                          2,
-                        )}
-                      </pre>
-                    )}
-                  </article>
-                );
-              })}
+        {/* ── Tactical Layout (Map & Incident Feed) ── */}
+        <div
+          className={`${styles.tacticalLayout} ${
+            viewMode === 'SPLIT' ? styles.tacticalLayoutSplit : ''
+          }`}
+        >
+          {/* Tactical Map Column (visible in SPLIT or MAP_ONLY) */}
+          {viewMode !== 'FEED_ONLY' && (
+            <div
+              className={`${styles.mapColumn} ${
+                viewMode === 'SPLIT' ? styles.mapColumnSticky : ''
+              }`}
+            >
+              <TacticalMap
+                incidents={displayedIncidents}
+                selectedIncidentId={selectedIncidentId}
+                onSelectIncident={(inc) => {
+                  setSelectedIncidentId(inc.messageId);
+                }}
+                className={
+                  viewMode === 'MAP_ONLY'
+                    ? styles.mapContainerFull
+                    : styles.mapContainerSplit
+                }
+                viewTrigger={viewMode}
+              />
             </div>
           )}
-        </section>
+
+          {/* Incident Feed Column (visible in SPLIT or FEED_ONLY) */}
+          {viewMode !== 'MAP_ONLY' && (
+            <div className={styles.feedColumn}>
+              {/* ── Live Incident Feed ── */}
+              <section className={styles.feedSection}>
+                <div className={styles.feedHeader}>
+                  <div className={styles.feedTitleGroup}>
+                    <h2 className={styles.feedTitle}>Live Incident Feed</h2>
+                    <div className={styles.liveBeacon}>
+                      <span className={styles.liveBeaconDot} />
+                      REAL-TIME STREAM
+                    </div>
+                  </div>
+                  <span className={styles.feedCountBadge}>
+                    Showing {displayedIncidents.length} of {totalIncidents} Transmissions
+                  </span>
+                </div>
+
+                {displayedIncidents.length === 0 ? (
+                  <div className={styles.emptyFeed}>
+                    <div className={styles.emptyRadarAnim} />
+                    <div className={styles.emptyTitle}>No Emergency Transmissions in Queue</div>
+                    <p className={styles.emptyDesc}>
+                      Listening on opportunistic BLE gateway synchronization channel. Transmissions
+                      relayed via store-carry-forward nodes will stream here automatically.
+                    </p>
+                    <button
+                      type="button"
+                      className={`${styles.btnIcon} ${styles.btnSimulate}`}
+                      onClick={() => simulateInboundIncident()}
+                    >
+                      Simulate Inbound Transmission
+                    </button>
+                  </div>
+                ) : (
+                  <div className={styles.incidentList}>
+                    {displayedIncidents.map((incident) => {
+                      const payloadObj = parsePayload(incident.payload);
+                      const details = extractDetails(payloadObj);
+                      const category = extractCategory(payloadObj, incident.priority);
+                      const headcount = extractHeadcount(payloadObj);
+                      const isExpanded = expandedPayloadIds.has(incident.messageId);
+                      const isCopied = copiedId === incident.messageId;
+
+                      // Priority card border style
+                      const priorityClass =
+                        incident.priority === Priority.EMERGENCY_AUTHORITY
+                          ? styles.cardPriorityP0
+                          : incident.priority === Priority.CIVILIAN_SOS
+                            ? styles.cardPriorityP1
+                            : incident.priority === Priority.RESOURCE_LOGISTICS
+                              ? styles.cardPriorityP2
+                              : styles.cardPriorityP3;
+
+                      return (
+                        <article
+                          key={incident.messageId}
+                          className={`${styles.incidentCard} ${priorityClass}`}
+                        >
+                          {/* Top Row: Triage Tag + Security Badge + Timestamps */}
+                          <div className={styles.cardHeaderRow}>
+                            <div className={styles.cardHeaderBadges}>
+                              {/* Triage Tag */}
+                              {incident.priority === Priority.EMERGENCY_AUTHORITY && (
+                                <span className={styles.triageP0}>
+                                  ⚠️ P0 AUTHORITY ALERT
+                                </span>
+                              )}
+                              {incident.priority === Priority.CIVILIAN_SOS && (
+                                <span className={styles.triageP1}>
+                                  🚨 P1 CRITICAL SOS
+                                </span>
+                              )}
+                              {incident.priority === Priority.RESOURCE_LOGISTICS && (
+                                <span className={styles.triageP2}>
+                                  📦 P2 SUPPLIES REQUEST
+                                </span>
+                              )}
+                              {incident.priority === Priority.GENERAL_INFO && (
+                                <span className={styles.triageP3}>
+                                  ℹ️ P3 GENERAL INFO
+                                </span>
+                              )}
+
+                              {/* Cryptographic Security Badge */}
+                              <span
+                                className={styles.securityBadge}
+                                title="Decoded from Ed25519 digitally signed wire frame. Cryptographic authenticity validated by gateway."
+                              >
+                                <span className={styles.securityBadgeIcon}>🛡️</span>
+                                Ed25519 Cryptographically Verified
+                              </span>
+                            </div>
+
+                            {/* Timestamp */}
+                            <div className={styles.timestampGroup}>
+                              <span className={styles.timeRelative}>
+                                {formatRelativeTime(incident.timestamp)}
+                              </span>
+                              <span>•</span>
+                              <span className={styles.timeUtc}>
+                                {formatUtcTime(incident.timestamp)}
+                              </span>
+                            </div>
+                          </div>
+
+                          {/* Card Body: Category, Headcount, Situational Details */}
+                          <div className={styles.cardBody}>
+                            <div className={styles.payloadHeaderRow}>
+                              <span className={styles.categoryTag}>{category}</span>
+
+                              {headcount !== null && (
+                                <span className={styles.headcountBadge}>
+                                  <span>👥</span>
+                                  <span>Headcount:</span>
+                                  <span className={styles.headcountValue}>{headcount}</span>
+                                  <span>Victim{headcount > 1 ? 's' : ''} at Risk</span>
+                                </span>
+                              )}
+                            </div>
+
+                            <p className={styles.situationalNotes}>{details}</p>
+                          </div>
+
+                          {/* Packet Telemetry Data Grid */}
+                          <div className={styles.telemetryGrid}>
+                            {/* Message ID Slice */}
+                            <div className={styles.telemetryItem}>
+                              <span className={styles.telemetryKey}>Message ID</span>
+                              <span className={styles.telemetryValue}>
+                                #{incident.messageId.slice(0, 8)}...
+                                <button
+                                  type="button"
+                                  className={styles.copyBtn}
+                                  onClick={() => copyMessageId(incident.messageId)}
+                                  title="Copy full message ID"
+                                >
+                                  {isCopied ? '✓ Copied' : '📋'}
+                                </button>
+                              </span>
+                            </div>
+
+                            {/* Hop Count */}
+                            <div className={styles.telemetryItem}>
+                              <span className={styles.telemetryKey}>Relay Hops</span>
+                              <span className={styles.telemetryValue}>
+                                🔀 {incident.hopCount} {incident.hopCount === 1 ? 'Hop' : 'Hops'}
+                              </span>
+                            </div>
+
+                            {/* Epoch Timestamp */}
+                            <div className={styles.telemetryItem}>
+                              <span className={styles.telemetryKey}>Epoch Timestamp</span>
+                              <span className={styles.telemetryValue}>
+                                ⏱️ {formatEpoch(incident.timestamp)}
+                              </span>
+                            </div>
+
+                            {/* Lat / Lng Coordinates */}
+                            <div className={styles.telemetryItem}>
+                              <span className={styles.telemetryKey}>GPS Coordinates</span>
+                              <span className={styles.telemetryValue}>
+                                {incident.lat !== null && incident.lng !== null ? (
+                                  <a
+                                    href={`https://www.openstreetmap.org/?mlat=${incident.lat}&mlon=${incident.lng}#map=16/${incident.lat}/${incident.lng}`}
+                                    target="_blank"
+                                    rel="noreferrer"
+                                    className={styles.coordLink}
+                                    title="View GPS fix on OpenStreetMap"
+                                  >
+                                    📍 {Number(incident.lat).toFixed(4)}°, {Number(incident.lng).toFixed(4)}° ↗
+                                  </a>
+                                ) : (
+                                  <span style={{ color: '#64748b' }}>📍 GPS Offline</span>
+                                )}
+                              </span>
+                            </div>
+                          </div>
+
+                          {/* Expandable Raw Payload Inspector */}
+                          <button
+                            type="button"
+                            className={styles.rawDetailsToggle}
+                            onClick={() => togglePayloadExpand(incident.messageId)}
+                          >
+                            {isExpanded ? '▲ Hide Raw Wire Data' : '▼ Inspect Wire Payload JSON'}
+                          </button>
+
+                          {isExpanded && (
+                            <pre className={styles.rawPayloadBox}>
+                              {JSON.stringify(
+                                {
+                                  messageId: incident.messageId,
+                                  priority: incident.priority,
+                                  hopCount: incident.hopCount,
+                                  timestamp: incident.timestamp,
+                                  lat: incident.lat,
+                                  lng: incident.lng,
+                                  receivedAt: incident.receivedAt,
+                                  payload: payloadObj,
+                                  signatureVerified: true,
+                                  cryptoAlgorithm: 'Ed25519-SHA512',
+                                },
+                                null,
+                                2,
+                              )}
+                            </pre>
+                          )}
+                        </article>
+                      );
+                    })}
+                  </div>
+                )}
+              </section>
+            </div>
+          )}
+        </div>
       </main>
     </div>
   );
