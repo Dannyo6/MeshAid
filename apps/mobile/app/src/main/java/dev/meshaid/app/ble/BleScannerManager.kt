@@ -26,15 +26,16 @@ import java.util.concurrent.ConcurrentHashMap
  * Discovers neighboring nodes using a targeted ScanFilter for the MeshAid 128-bit
  * custom Service UUID and reassembles multi-chunk legacy packets.
  */
-class BleScannerManager(private val context: Context) {
+class BleScannerManager(private val context: Context? = null) {
 
     companion object {
         private const val TAG = "BleScannerManager"
-        private const val REASSEMBLY_TTL_MS = 15_000L // Chunks expire after 15s if incomplete
+        const val REASSEMBLY_TTL_MS = 30_000L // Chunks expire after 30s TTL if incomplete
+        const val MAX_ASSEMBLY_SESSIONS = 100  // Bounded LRU cache size limit
     }
 
     private val bluetoothManager: BluetoothManager? =
-        context.getSystemService(Context.BLUETOOTH_SERVICE) as? BluetoothManager
+        context?.getSystemService(Context.BLUETOOTH_SERVICE) as? BluetoothManager
     private val bluetoothAdapter: BluetoothAdapter?
         get() = bluetoothManager?.adapter
     private val scanner: BluetoothLeScanner?
@@ -50,24 +51,72 @@ class BleScannerManager(private val context: Context) {
     var onPacketReceived: ((MeshAidPacket) -> Unit)? = null
     var onScanError: ((errorCode: Int, message: String) -> Unit)? = null
 
-    // Tracking chunks: Map of CorrelationKey -> ChunkBuffer
-    private val reassemblyMap = ConcurrentHashMap<String, ChunkAssemblySession>()
+    // Bounded LRU Cache capped at 100 entries (access-ordered)
+    internal val assemblyMap: HashMap<String, ChunkAssemblySession> =
+        object : LinkedHashMap<String, ChunkAssemblySession>(16, 0.75f, true) {
+            override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, ChunkAssemblySession>?): Boolean {
+                return size > MAX_ASSEMBLY_SESSIONS
+            }
+        }
 
     // Deduplication filter: recently seen packet message IDs with timestamps
     private val seenMessageIds = ConcurrentHashMap<String, Long>()
 
-    private class ChunkAssemblySession(
+    /**
+     * Represents an active chunk reassembly session with strict bounds enforcement
+     * and a 30s expiration lifecycle.
+     */
+    internal class ChunkAssemblySession(
         val totalChunks: Int,
-        val createdAt: Long = System.currentTimeMillis()
+        var createdAt: Long = System.currentTimeMillis()
     ) {
-        val chunks = ConcurrentHashMap<Int, ByteArray>()
+        init {
+            require(totalChunks in 1..16) {
+                "totalChunks must be in 1..16, got $totalChunks"
+            }
+        }
 
-        fun isComplete(): Boolean = chunks.size == totalChunks
+        private val chunkArray: Array<ByteArray?> = arrayOfNulls(totalChunks)
+        private var receivedChunksCount = 0
 
+        /**
+         * Adds a chunk payload at the specified index.
+         * Enforces require(chunkIndex in 0 until totalChunks) and prevents duplicate chunk overwrites.
+         * Returns true if chunk was accepted, false if it was already ingested.
+         */
+        @Synchronized
+        fun addChunk(chunkIndex: Int, chunkData: ByteArray): Boolean {
+            require(chunkIndex in 0 until totalChunks) {
+                "chunkIndex $chunkIndex is out of bounds (totalChunks=$totalChunks)"
+            }
+            if (chunkArray[chunkIndex] != null) {
+                // Prevent duplicate chunk payload overwrites if the chunk was already ingested
+                return false
+            }
+            chunkArray[chunkIndex] = chunkData
+            receivedChunksCount++
+            return true
+        }
+
+        fun getChunk(chunkIndex: Int): ByteArray? {
+            if (chunkIndex !in 0 until totalChunks) return null
+            return chunkArray[chunkIndex]
+        }
+
+        val chunks: Map<Int, ByteArray>
+            @Synchronized
+            get() = chunkArray.mapIndexedNotNull { index, bytes ->
+                if (bytes != null) index to bytes else null
+            }.toMap()
+
+        @Synchronized
+        fun isComplete(): Boolean = receivedChunksCount == totalChunks
+
+        @Synchronized
         fun assemble(): ByteArray {
             val bos = ByteArrayOutputStream()
             for (i in 0 until totalChunks) {
-                val data = chunks[i] ?: return ByteArray(0)
+                val data = chunkArray[i] ?: return ByteArray(0)
                 bos.write(data)
             }
             return bos.toByteArray()
@@ -135,7 +184,9 @@ class BleScannerManager(private val context: Context) {
             Log.w(TAG, "Error stopping scan: ${e.message}")
         } finally {
             isScanning = false
-            reassemblyMap.clear()
+            synchronized(assemblyMap) {
+                assemblyMap.clear()
+            }
             Log.i(TAG, "BLE Scanner stopped")
         }
     }
@@ -176,33 +227,71 @@ class BleScannerManager(private val context: Context) {
         }
     }
 
-    private fun processLegacyChunk(deviceAddress: String, chunkBytes: ByteArray) {
-        val buffer = ByteBuffer.wrap(chunkBytes)
-        val totalChunks = buffer.get().toInt() and 0xFF
-        val chunkIndex = buffer.get().toInt() and 0xFF
-        val corr0 = buffer.get()
-        val corr1 = buffer.get()
-        val sessionKey = "$deviceAddress-$corr0-$corr1"
-
-        val chunkData = ByteArray(buffer.remaining())
-        buffer.get(chunkData)
-
-        // Clean expired sessions
-        cleanExpiredSessions()
-
-        val session = reassemblyMap.computeIfAbsent(sessionKey) {
-            ChunkAssemblySession(totalChunks)
+    /**
+     * Processes a single legacy broadcast chunk.
+     * Enforces TTL expiration pruning before access, validates bounds (totalChunks in 1..16),
+     * and manages LRU cache entries.
+     */
+    @Synchronized
+    internal fun processLegacyChunk(deviceAddress: String, chunkBytes: ByteArray): Boolean {
+        if (chunkBytes.size <= BleConstants.LEGACY_CHUNK_HEADER_SIZE) {
+            return false
         }
 
-        session.chunks[chunkIndex] = chunkData
+        return try {
+            val buffer = ByteBuffer.wrap(chunkBytes)
+            val totalChunks = buffer.get().toInt() and 0xFF
+            val chunkIndex = buffer.get().toInt() and 0xFF
+            val corr0 = buffer.get()
+            val corr1 = buffer.get()
+            val sessionKey = "$deviceAddress-$corr0-$corr1"
 
-        if (session.isComplete()) {
-            val assembledPacketBytes = session.assemble()
-            reassemblyMap.remove(sessionKey)
-
-            if (assembledPacketBytes.size >= MeshAidPacketCodec.HEADER_SIZE) {
-                decodeAndDispatch(assembledPacketBytes)
+            // Enforce totalChunks in 1..16: drop fragmented announcements advertising > 16 chunks
+            if (totalChunks !in 1..16) {
+                Log.w(TAG, "Dropping malformed chunk: totalChunks $totalChunks not in 1..16")
+                return false
             }
+
+            // Enforce chunkIndex in 0 until totalChunks: prevent out-of-bounds array writes
+            if (chunkIndex !in 0 until totalChunks) {
+                Log.w(TAG, "Dropping malformed chunk: chunkIndex $chunkIndex out of bounds for totalChunks $totalChunks")
+                return false
+            }
+
+            val chunkData = ByteArray(buffer.remaining())
+            buffer.get(chunkData)
+
+            val now = System.currentTimeMillis()
+            // Prune all sessions older than 30s TTL before adding or looking up a chunk
+            cleanExpiredSessions(now)
+
+            var session = assemblyMap[sessionKey]
+            if (session == null) {
+                session = ChunkAssemblySession(totalChunks = totalChunks, createdAt = now)
+                assemblyMap[sessionKey] = session
+            } else if (session.totalChunks != totalChunks) {
+                // Total chunks mismatch for the same correlation ID; start fresh session
+                session = ChunkAssemblySession(totalChunks = totalChunks, createdAt = now)
+                assemblyMap[sessionKey] = session
+            }
+
+            // Add chunk payload (prevents duplicate overwrites)
+            session.addChunk(chunkIndex, chunkData)
+
+            if (session.isComplete()) {
+                val assembledPacketBytes = session.assemble()
+                assemblyMap.remove(sessionKey)
+
+                if (assembledPacketBytes.size >= MeshAidPacketCodec.HEADER_SIZE) {
+                    decodeAndDispatch(assembledPacketBytes)
+                }
+                true
+            } else {
+                false
+            }
+        } catch (e: Exception) {
+            Log.w(TAG, "Discarded malformed chunk: ${e.message}")
+            false
         }
     }
 
@@ -232,8 +321,11 @@ class BleScannerManager(private val context: Context) {
         }
     }
 
-    private fun cleanExpiredSessions() {
-        val now = System.currentTimeMillis()
-        reassemblyMap.entries.removeIf { (now - it.value.createdAt) > REASSEMBLY_TTL_MS }
+    /**
+     * Prunes all sessions where System.currentTimeMillis() - session.createdAt > 30_000L (30s TTL)
+     */
+    @Synchronized
+    internal fun cleanExpiredSessions(now: Long = System.currentTimeMillis()) {
+        assemblyMap.entries.removeIf { (now - it.value.createdAt) > REASSEMBLY_TTL_MS }
     }
 }
