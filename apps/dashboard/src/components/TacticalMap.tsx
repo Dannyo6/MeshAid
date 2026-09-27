@@ -88,16 +88,16 @@ function getTacticalMarkerIcon(priority: number, isSelected = false): L.DivIcon 
   }
 
   let pinClass = 'tactical-pin-p3';
-  let badgeLabel = 'P3';
+  let badgeLabel = '[P3:INF]';
   if (priority === 0) {
     pinClass = 'tactical-pin-p0';
-    badgeLabel = 'P0';
+    badgeLabel = '[P0:AUTH]';
   } else if (priority === 1) {
     pinClass = 'tactical-pin-p1';
-    badgeLabel = 'P1';
+    badgeLabel = '[P1:SOS]';
   } else if (priority === 2) {
     pinClass = 'tactical-pin-p2';
-    badgeLabel = 'P2';
+    badgeLabel = '[P2:SUP]';
   }
 
   const selectedClass = isSelected ? ' tactical-pin-selected' : '';
@@ -266,8 +266,9 @@ export const TacticalMap: React.FC<TacticalMapProps> = ({
         className="tactical-map-container"
       >
         <TileLayer
-          attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>'
-          url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
+          attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+          url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+          className="map-tiles-dark"
           maxZoom={19}
         />
 

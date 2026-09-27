@@ -49,15 +49,11 @@ export const TopHud: React.FC<TopHudProps> = ({
   p3Count,
 }) => {
   const [currentTime, setCurrentTime] = useState<string>('');
-  const [currentUtc, setCurrentUtc] = useState<string>('');
 
   useEffect(() => {
     const updateClocks = () => {
       const now = new Date();
       setCurrentTime(now.toLocaleTimeString('en-US', { hour12: false }));
-      setCurrentUtc(
-        now.toISOString().replace('T', ' ').slice(11, 19) + ' ZULU'
-      );
     };
     updateClocks();
     const timer = setInterval(updateClocks, 1000);
@@ -78,9 +74,7 @@ export const TopHud: React.FC<TopHudProps> = ({
           <div className="hud-callsign font-mono">
             <span className="hud-title">MESHAID</span>
             <span className="hud-divider">//</span>
-            <span className="hud-sub">TAC-C2 OPS</span>
-            <span className="hud-divider">//</span>
-            <span className="hud-sector">SECTOR-01</span>
+            <span className="hud-sub">TACTICAL COMMAND</span>
           </div>
         </div>
 
@@ -90,7 +84,7 @@ export const TopHud: React.FC<TopHudProps> = ({
           <div className="status-pill rf-status" title="Mesh RF Uplink status">
             <Activity size={12} className="text-emerald-400" />
             <span className="status-label">RF UPLINK:</span>
-            <span className="status-value text-emerald-400">915MHz LoRa / BLE 5.4</span>
+            <span className="status-value text-emerald-400">BLE Offline Mesh</span>
           </div>
 
           {/* Cryptographic Engine */}
@@ -100,11 +94,9 @@ export const TopHud: React.FC<TopHudProps> = ({
             <span className="status-value text-purple-400">ED25519 VERIFIED</span>
           </div>
 
-          {/* Dual Mission Clocks */}
-          <div className="status-pill clock-pill" title="Mission Time (Local & UTC Zulu)">
+          {/* Mission Clock */}
+          <div className="status-pill clock-pill" title="Mission Time (Local)">
             <Clock size={12} className="text-slate-400" />
-            <span className="clock-utc text-cyan-300">{currentUtc}</span>
-            <span className="clock-divider">|</span>
             <span className="clock-local text-slate-300">{currentTime} LOC</span>
           </div>
 
@@ -119,15 +111,14 @@ export const TopHud: React.FC<TopHudProps> = ({
               <>
                 <span className="radar-dot" />
                 <Wifi size={12} />
-                <span className="ws-text">WS: ACTIVE (PORT 3000)</span>
+                <span className="ws-text">Gateway Online</span>
               </>
             ) : (
               <>
                 <span className="radar-dot-alert" />
                 <WifiOff size={12} />
                 <span className="ws-text">
-                  RETRY #{connectionState.retryAttempt} (
-                  {Math.round(connectionState.nextRetryMs / 1000)}s)
+                  Reconnecting...
                 </span>
               </>
             )}

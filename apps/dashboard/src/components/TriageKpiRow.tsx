@@ -136,7 +136,6 @@ export const TriageKpiRow: React.FC<TriageKpiRowProps> = ({
             <TrendingUp size={12} />
             <span>FIELD QUOTA DISPATCH</span>
           </div>
-          <span className="kpi-secondary text-slate-400">BLOOD / POWER / MEDS</span>
         </div>
       </SpotlightCard>
 

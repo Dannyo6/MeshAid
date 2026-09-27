@@ -545,7 +545,7 @@
 /* View Modes */
 .splitLayout {
   display: grid;
-  grid-template-columns: 46% 54%;
+  grid-template-columns: 400px 1fr;
   gap: 14px;
   height: calc(100vh - 165px);
 }

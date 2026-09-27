@@ -479,3 +479,7 @@
   pointer-events: none;
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.7);
 }
+
+.map-tiles-dark {
+  filter: brightness(0.6) invert(1) contrast(2.5) hue-rotate(200deg) saturate(0.2) brightness(0.7);
+}
