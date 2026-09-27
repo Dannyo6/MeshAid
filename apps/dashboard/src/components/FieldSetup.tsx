@@ -3,11 +3,9 @@ import { Download, ShieldAlert } from 'lucide-react';
 
 export const FieldSetup: React.FC = () => {
   return (
-    <div className="max-w-3xl mx-auto pt-12 pb-24 px-6 text-zinc-300 overflow-y-auto w-full">
-      <h1 className="text-3xl font-semibold tracking-tight text-zinc-50 mb-3">
-        Field APK &amp; Setup
-      </h1>
-      <p className="text-zinc-400 text-base leading-relaxed mb-8 max-w-2xl">
+    <section className="max-w-3xl mx-auto py-12 px-6 space-y-8 text-zinc-300 overflow-y-auto w-full">
+      <h1 className="text-2xl font-semibold tracking-tight text-zinc-50">Field APK &amp; Setup</h1>
+      <p className="text-sm text-zinc-400 mt-1 max-w-2xl">
         Instructions for provisioning offline Android edge devices. The MeshAid mobile agent requires
         extensive, non-standard runtime permissions to operate continuously in a disconnected
         physical environment using BLE background scanning.
@@ -32,8 +30,8 @@ export const FieldSetup: React.FC = () => {
         <p className="text-sm text-zinc-400 leading-relaxed mb-3 ml-9">
           Enable Developer Options and USB Debugging on the target Android device. Connect via USB and sideload the APK:
         </p>
-        <pre className="bg-zinc-900 border border-zinc-800 rounded-lg p-4 mt-3 mb-6 overflow-x-auto ml-9">
-          <code className="text-sm font-mono text-zinc-300">adb install -r app-debug.apk</code>
+        <pre className="bg-zinc-900 border border-zinc-800 p-4 rounded-lg overflow-x-auto text-xs font-mono text-zinc-200 mt-3 ml-9">
+          <code>adb install -r app-debug.apk</code>
         </pre>
       </div>
 
@@ -46,8 +44,8 @@ export const FieldSetup: React.FC = () => {
         <p className="text-sm text-zinc-400 leading-relaxed mb-3 ml-9">
           Grant hazardous permissions directly via ADB to avoid user prompt fatigue and guarantee background operation.
         </p>
-        <pre className="bg-zinc-900 border border-zinc-800 rounded-lg p-4 mt-3 mb-6 overflow-x-auto ml-9">
-          <code className="text-sm font-mono text-zinc-300">{`adb shell pm grant dev.meshaid.app android.permission.BLUETOOTH_SCAN
+        <pre className="bg-zinc-900 border border-zinc-800 p-4 rounded-lg overflow-x-auto text-xs font-mono text-zinc-200 mt-3 ml-9">
+          <code>{`adb shell pm grant dev.meshaid.app android.permission.BLUETOOTH_SCAN
 adb shell pm grant dev.meshaid.app android.permission.BLUETOOTH_ADVERTISE
 adb shell pm grant dev.meshaid.app android.permission.ACCESS_FINE_LOCATION
 adb shell pm grant dev.meshaid.app android.permission.POST_NOTIFICATIONS`}</code>
@@ -64,8 +62,8 @@ adb shell pm grant dev.meshaid.app android.permission.POST_NOTIFICATIONS`}</code
           Bypass Android Doze mode and proprietary OEM task killers. Without this, BLE radio halts after
           approximately 5 minutes of screen-off.
         </p>
-        <pre className="bg-zinc-900 border border-zinc-800 rounded-lg p-4 mt-3 mb-3 overflow-x-auto ml-9">
-          <code className="text-sm font-mono text-zinc-300">adb shell dumpsys deviceidle whitelist +dev.meshaid.app</code>
+        <pre className="bg-zinc-900 border border-zinc-800 p-4 rounded-lg overflow-x-auto text-xs font-mono text-zinc-200 mt-3 ml-9">
+          <code>adb shell dumpsys deviceidle whitelist +dev.meshaid.app</code>
         </pre>
         <p className="text-xs text-zinc-500 ml-9 flex items-center gap-1.5">
           <ShieldAlert size={12} />
@@ -97,6 +95,6 @@ adb shell pm grant dev.meshaid.app android.permission.POST_NOTIFICATIONS`}</code
           </div>
         </div>
       </div>
-    </div>
+    </section>
   );
 };

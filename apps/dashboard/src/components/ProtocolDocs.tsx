@@ -3,11 +3,9 @@ import { Shield } from 'lucide-react';
 
 export const ProtocolDocs: React.FC = () => {
   return (
-    <div className="max-w-4xl mx-auto pt-12 pb-24 px-6 text-zinc-300 overflow-y-auto w-full">
-      <h1 className="text-3xl font-semibold tracking-tight text-zinc-50 mb-3">
-        Protocol Specification
-      </h1>
-      <p className="text-zinc-400 text-base leading-relaxed mb-12 max-w-2xl">
+    <article className="max-w-4xl mx-auto py-12 px-6 text-zinc-300 overflow-y-auto w-full">
+      <h1 className="text-2xl font-semibold tracking-tight text-zinc-50">Protocol Specification</h1>
+      <p className="text-sm text-zinc-400 mt-1 mb-12 max-w-2xl">
         MeshAid operates on a strictly deterministic, non-AI delay-tolerant networking (DTN) architecture.
         Field nodes ingest cryptographically signed telemetry over Bluetooth Low Energy, cache it locally in a
         priority-evicted SQLite database, and physically carry the data until they bridge an edge uplink or
@@ -20,13 +18,13 @@ export const ProtocolDocs: React.FC = () => {
       </h2>
       <div className="overflow-x-auto">
         <table className="w-full text-sm text-left border-collapse mt-4">
-          <thead>
+          <thead className="border-b border-zinc-800 text-zinc-400 text-xs uppercase tracking-wider">
             <tr>
-              <th className="border-b border-zinc-800 py-3 text-zinc-400 font-medium pr-4">Offset</th>
-              <th className="border-b border-zinc-800 py-3 text-zinc-400 font-medium pr-4">Size</th>
-              <th className="border-b border-zinc-800 py-3 text-zinc-400 font-medium pr-4">Field</th>
-              <th className="border-b border-zinc-800 py-3 text-zinc-400 font-medium pr-4">Type</th>
-              <th className="border-b border-zinc-800 py-3 text-zinc-400 font-medium">Description</th>
+              <th className="py-3 font-medium pr-4">Offset</th>
+              <th className="py-3 font-medium pr-4">Size</th>
+              <th className="py-3 font-medium pr-4">Field</th>
+              <th className="py-3 font-medium pr-4">Type</th>
+              <th className="py-3 font-medium">Description</th>
             </tr>
           </thead>
           <tbody>
@@ -135,6 +133,6 @@ export const ProtocolDocs: React.FC = () => {
           </p>
         </div>
       </div>
-    </div>
+    </article>
   );
 };

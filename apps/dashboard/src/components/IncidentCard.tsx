@@ -143,14 +143,14 @@ export const IncidentCard: React.FC<IncidentCardProps> = ({
   const getPriorityBadge = () => {
     switch (incident.priority) {
       case 0:
-        return { label: '[P0:AUTHORITY]', cls: 'prio-p0' };
+        return { label: 'P0: AUTHORITY', cls: 'bg-purple-900/40 text-purple-400 border-purple-800/50' };
       case 1:
-        return { label: '[P1:CRIT-SOS]', cls: 'prio-p1' };
+        return { label: 'P1: CRIT-SOS', cls: 'bg-rose-900/40 text-rose-400 border-rose-800/50' };
       case 2:
-        return { label: '[P2:SUP-LOGS]', cls: 'prio-p2' };
+        return { label: 'P2: SUP-LOGS', cls: 'bg-amber-900/40 text-amber-400 border-amber-800/50' };
       case 3:
       default:
-        return { label: '[P3:INTEL]', cls: 'prio-p3' };
+        return { label: 'P3: INTEL', cls: 'bg-emerald-900/40 text-emerald-400 border-emerald-800/50' };
     }
   };
 
@@ -166,20 +166,20 @@ export const IncidentCard: React.FC<IncidentCardProps> = ({
     >
       {/* ── Card Header ── */}
       <div className="incident-card-header font-mono">
-        <div className="card-header-left">
-          {/* NATO-Style Bracketed Priority Badge */}
-          <span className={`nato-priority-badge ${prioMeta.cls}`}>
+        <div className="card-header-left flex items-center gap-2">
+          {/* Priority Badge */}
+          <span className={`px-2 py-0.5 rounded text-[10px] font-medium border ${prioMeta.cls}`}>
             {prioMeta.label}
           </span>
 
           {/* Cryptographic Shield */}
-          <span className="crypto-shield-tag" title="Ed25519 signature verified via curve25519">
+          <span className="flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-medium bg-zinc-800 text-zinc-300 border border-zinc-700/50" title="Ed25519 signature verified via curve25519">
             <ShieldCheck size={12} className="text-emerald-400" />
-            <span>[ED25519:VERIFIED]</span>
+            <span>ED25519 VERIFIED</span>
           </span>
 
           {/* Hop Progression */}
-          <span className="hop-tag" title="Mesh relay hop progression">
+          <span className="flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-medium bg-zinc-800 text-zinc-300 border border-zinc-700/50" title="Mesh relay hop progression">
             <GitFork size={11} className="text-cyan-400" />
             <span>HOP 0{incident.hopCount}/07</span>
           </span>
@@ -269,7 +269,7 @@ export const IncidentCard: React.FC<IncidentCardProps> = ({
         {hasGps && (
           <button
             type="button"
-            className="action-btn map-focus-btn"
+            className="flex items-center gap-1.5 text-xs text-zinc-400 hover:text-cyan-400 transition-colors"
             onClick={(e) => {
               e.stopPropagation();
               onFocusMap(incident);
@@ -277,13 +277,13 @@ export const IncidentCard: React.FC<IncidentCardProps> = ({
             title="Pan and zoom Tactical GIS Radar to this location"
           >
             <Crosshair size={12} className="text-cyan-400" />
-            <span>[🎯 FOCUS MAP]</span>
+            <span>FOCUS MAP</span>
           </button>
         )}
 
         <button
           type="button"
-          className={`action-btn hex-toggle-btn ${isExpanded ? 'active' : ''}`}
+          className={`flex items-center gap-1.5 text-xs transition-colors ${isExpanded ? 'text-amber-400' : 'text-zinc-400 hover:text-amber-400'}`}
           onClick={(e) => {
             e.stopPropagation();
             setIsExpanded(!isExpanded);
@@ -291,7 +291,7 @@ export const IncidentCard: React.FC<IncidentCardProps> = ({
           title="Inspect raw 96-byte packet frame and decoded JSON"
         >
           <Terminal size={12} className="text-amber-400" />
-          <span>[🔍 96B WIRE INSPECTOR]</span>
+          <span>96B WIRE INSPECTOR</span>
           {isExpanded ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
         </button>
       </div>

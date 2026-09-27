@@ -6,7 +6,6 @@ import {
   Activity,
   Search,
   X,
-  Zap,
   LayoutGrid,
   List,
   Map as MapIcon,
@@ -23,7 +22,6 @@ interface TopHudProps {
   onSearchChange: (query: string) => void;
   viewMode: 'SPLIT' | 'FEED_ONLY' | 'MAP_ONLY';
   onChangeViewMode: (mode: 'SPLIT' | 'FEED_ONLY' | 'MAP_ONLY') => void;
-  onOpenSimulator: () => void;
   totalCount: number;
   filteredCount: number;
   p0Count: number;
@@ -40,7 +38,6 @@ export const TopHud: React.FC<TopHudProps> = ({
   onSearchChange,
   viewMode,
   onChangeViewMode,
-  onOpenSimulator,
   totalCount,
   filteredCount,
   p0Count,
@@ -132,51 +129,51 @@ export const TopHud: React.FC<TopHudProps> = ({
         <div className="filter-pill-group font-mono">
           <button
             type="button"
-            className={`filter-pill ${selectedFilter === 'ALL' ? 'active' : ''}`}
+            className={`flex items-center gap-1.5 px-2 py-0.5 rounded text-xs font-medium border transition-colors ${selectedFilter === 'ALL' ? 'bg-zinc-700 text-zinc-100 border-zinc-600' : 'bg-zinc-800 text-zinc-300 border-zinc-700/50 hover:bg-zinc-700/80'}`}
             onClick={() => onSelectFilter('ALL')}
           >
-            <span>[ALL]</span>
-            <span className="pill-count">{totalCount}</span>
+            <span>ALL</span>
+            <span className="bg-zinc-900 px-1.5 rounded-sm text-[10px]">{totalCount}</span>
           </button>
 
           <button
             type="button"
-            className={`filter-pill pill-p0 ${selectedFilter === 0 ? 'active' : ''}`}
+            className={`flex items-center gap-1.5 px-2 py-0.5 rounded text-xs font-medium border transition-colors ${selectedFilter === 0 ? 'bg-purple-900/40 text-purple-400 border-purple-800/50' : 'bg-zinc-800 text-zinc-300 border-zinc-700/50 hover:bg-zinc-700/80'}`}
             onClick={() => onSelectFilter(0)}
           >
-            <span className="dot dot-p0" />
-            <span>[P0:AUTH]</span>
-            <span className="pill-count">{p0Count}</span>
+            <span className="w-1.5 h-1.5 rounded-full bg-purple-500"></span>
+            <span>P0: AUTH</span>
+            <span className="bg-zinc-900 px-1.5 rounded-sm text-[10px]">{p0Count}</span>
           </button>
 
           <button
             type="button"
-            className={`filter-pill pill-p1 ${selectedFilter === 1 ? 'active' : ''}`}
+            className={`flex items-center gap-1.5 px-2 py-0.5 rounded text-xs font-medium border transition-colors ${selectedFilter === 1 ? 'bg-rose-900/40 text-rose-400 border-rose-800/50' : 'bg-zinc-800 text-zinc-300 border-zinc-700/50 hover:bg-zinc-700/80'}`}
             onClick={() => onSelectFilter(1)}
           >
-            <span className="dot dot-p1" />
-            <span>[P1:SOS]</span>
-            <span className="pill-count">{p1Count}</span>
+            <span className="w-1.5 h-1.5 rounded-full bg-rose-500"></span>
+            <span>P1: SOS</span>
+            <span className="bg-zinc-900 px-1.5 rounded-sm text-[10px]">{p1Count}</span>
           </button>
 
           <button
             type="button"
-            className={`filter-pill pill-p2 ${selectedFilter === 2 ? 'active' : ''}`}
+            className={`flex items-center gap-1.5 px-2 py-0.5 rounded text-xs font-medium border transition-colors ${selectedFilter === 2 ? 'bg-amber-900/40 text-amber-400 border-amber-800/50' : 'bg-zinc-800 text-zinc-300 border-zinc-700/50 hover:bg-zinc-700/80'}`}
             onClick={() => onSelectFilter(2)}
           >
-            <span className="dot dot-p2" />
-            <span>[P2:SUPL]</span>
-            <span className="pill-count">{p2Count}</span>
+            <span className="w-1.5 h-1.5 rounded-full bg-amber-500"></span>
+            <span>P2: SUP</span>
+            <span className="bg-zinc-900 px-1.5 rounded-sm text-[10px]">{p2Count}</span>
           </button>
 
           <button
             type="button"
-            className={`filter-pill pill-p3 ${selectedFilter === 3 ? 'active' : ''}`}
+            className={`flex items-center gap-1.5 px-2 py-0.5 rounded text-xs font-medium border transition-colors ${selectedFilter === 3 ? 'bg-emerald-900/40 text-emerald-400 border-emerald-800/50' : 'bg-zinc-800 text-zinc-300 border-zinc-700/50 hover:bg-zinc-700/80'}`}
             onClick={() => onSelectFilter(3)}
           >
-            <span className="dot dot-p3" />
-            <span>[P3:INFO]</span>
-            <span className="pill-count">{p3Count}</span>
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+            <span>P3: INFO</span>
+            <span className="bg-zinc-900 px-1.5 rounded-sm text-[10px]">{p3Count}</span>
           </button>
         </div>
 
@@ -211,45 +208,35 @@ export const TopHud: React.FC<TopHudProps> = ({
         <div className="view-switcher-group font-mono">
           <button
             type="button"
-            className={`view-btn ${viewMode === 'SPLIT' ? 'active' : ''}`}
+            className={`flex items-center gap-1.5 px-2 py-0.5 rounded text-xs font-medium border transition-colors ${viewMode === 'SPLIT' ? 'bg-zinc-700 text-zinc-100 border-zinc-600' : 'bg-zinc-800 text-zinc-300 border-zinc-700/50 hover:bg-zinc-700/80'}`}
             onClick={() => onChangeViewMode('SPLIT')}
             title="Split view (Transmissions + Tactical Map)"
           >
             <LayoutGrid size={13} />
-            <span>[◫ SPLIT]</span>
+            <span>SPLIT</span>
           </button>
 
           <button
             type="button"
-            className={`view-btn ${viewMode === 'FEED_ONLY' ? 'active' : ''}`}
+            className={`flex items-center gap-1.5 px-2 py-0.5 rounded text-xs font-medium border transition-colors ${viewMode === 'FEED_ONLY' ? 'bg-zinc-700 text-zinc-100 border-zinc-600' : 'bg-zinc-800 text-zinc-300 border-zinc-700/50 hover:bg-zinc-700/80'}`}
             onClick={() => onChangeViewMode('FEED_ONLY')}
             title="Feed only view"
           >
             <List size={13} />
-            <span>[☰ FEED]</span>
+            <span>FEED</span>
           </button>
 
           <button
             type="button"
-            className={`view-btn ${viewMode === 'MAP_ONLY' ? 'active' : ''}`}
+            className={`flex items-center gap-1.5 px-2 py-0.5 rounded text-xs font-medium border transition-colors ${viewMode === 'MAP_ONLY' ? 'bg-zinc-700 text-zinc-100 border-zinc-600' : 'bg-zinc-800 text-zinc-300 border-zinc-700/50 hover:bg-zinc-700/80'}`}
             onClick={() => onChangeViewMode('MAP_ONLY')}
             title="Tactical Map only view"
           >
             <MapIcon size={13} />
-            <span>[🗺️ MAP]</span>
+            <span>MAP</span>
           </button>
         </div>
 
-        {/* Tactical Drill Injector Button */}
-        <button
-          type="button"
-          className="tactical-action-btn simulator-trigger-btn font-mono"
-          onClick={onOpenSimulator}
-          title="Open Tactical Packet Drill Simulator"
-        >
-          <Zap size={14} className="text-amber-400" />
-          <span>[⚡ SIMULATE PACKET]</span>
-        </button>
       </div>
     </header>
   );

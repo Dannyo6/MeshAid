@@ -4,7 +4,6 @@ import {
   List,
   Map as MapIcon,
   BarChart3,
-  Radio,
   AlertCircle,
   ArrowUpDown,
 } from 'lucide-react';
@@ -442,19 +441,31 @@ export function App() {
             Field Setup
           </button>
         </nav>
-        <div className="w-16"></div>
+        <div className="flex items-center gap-3">
+          <button
+            onClick={() => setIsSimulatorOpen(true)}
+            className="inline-flex items-center gap-2 px-4 py-2 bg-emerald-500 hover:bg-emerald-400 text-zinc-950 font-medium text-xs rounded-md shadow-sm transition-colors"
+          >
+            Simulate Node Telemetry
+          </button>
+        </div>
       </header>
 
       {activeView === 'RADAR' && (
-        <>
+        <main className="flex-1 flex flex-col w-full relative z-10 overflow-hidden bg-zinc-950 px-6 py-6 overflow-y-auto">
           {/* ── Faint Tactical Animated Grid Background Canvas (RADAR only) ── */}
           <Squares
             direction="diagonal"
             speed={0.2}
             squareSize={40}
-            borderColor="#1a1e29"
-            hoverFillColor="#1e2433"
+            borderColor="#18181b"
+            hoverFillColor="#27272a"
           />
+
+          <div className="mb-6 relative z-10">
+            <h1 className="text-2xl font-semibold tracking-tight text-zinc-50">Tactical C2 Radar</h1>
+            <p className="text-sm text-zinc-400 mt-1">Live geographic tracking and telemetry ingestion.</p>
+          </div>
 
           {/* ── Top HUD Operations Strip ── */}
           <TopHud
@@ -465,7 +476,6 @@ export function App() {
             onSearchChange={setSearchQuery}
             viewMode={viewMode}
             onChangeViewMode={setViewMode}
-            onOpenSimulator={() => setIsSimulatorOpen(true)}
             totalCount={totalIncidents}
             filteredCount={displayedIncidents.length}
             p0Count={p0AuthorityCount}
@@ -484,47 +494,44 @@ export function App() {
       />
 
       {/* ── Main Viewport Grid (Split / Feed Only / Map Only) ── */}
-      <main className={`${styles.mainViewport} ${layoutClass}`}>
+      <div className={`flex-1 flex gap-4 min-h-0 relative z-10 ${layoutClass}`}>
         {/* Left Pane: Incident Telemetry Stream */}
         {viewMode !== 'MAP_ONLY' && (
-          <section className={styles.feedPane}>
-            <div className={styles.feedHeaderBar}>
-              <div className={styles.feedHeaderLeft}>
-                <Radio size={13} className="text-cyan-400" />
-                <span className={`${styles.feedTitle} font-mono`}>
-                  TACTICAL TRANSMISSION FEED
+          <section className={`flex flex-col bg-zinc-900/40 border border-zinc-800/80 rounded-lg overflow-hidden ${viewMode === 'SPLIT' ? 'w-1/3' : 'w-full'}`}>
+            <div className="flex items-center justify-between px-4 py-3 border-b border-zinc-800/80 bg-zinc-900/80">
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-semibold text-zinc-300 uppercase tracking-wider">
+                  Tactical Feed
                 </span>
-                <span className={`${styles.feedCountBadge} font-mono tabular-nums`}>
+                <span className="px-1.5 py-0.5 rounded text-[10px] font-medium bg-zinc-800 text-zinc-400">
                   {displayedIncidents.length} / {totalIncidents}
                 </span>
               </div>
 
-              <div className={styles.feedHeaderRight}>
-                <button
-                  type="button"
-                  className={`${styles.sortModeBtn} font-mono`}
-                  onClick={() =>
-                    setSortMode((prev) =>
-                      prev === 'PRIORITY_CHRONO' ? 'PURE_CHRONO' : 'PRIORITY_CHRONO'
-                    )
-                  }
-                  title="Toggle Sorting Mode"
-                >
-                  <ArrowUpDown size={11} />
-                  <span>
-                    {sortMode === 'PRIORITY_CHRONO' ? 'SORT: PRIORITY + TIME' : 'SORT: CHRONO ONLY'}
-                  </span>
-                </button>
-              </div>
+              <button
+                type="button"
+                className="flex items-center gap-1.5 text-xs text-zinc-500 hover:text-zinc-300 transition-colors"
+                onClick={() =>
+                  setSortMode((prev) =>
+                    prev === 'PRIORITY_CHRONO' ? 'PURE_CHRONO' : 'PRIORITY_CHRONO'
+                  )
+                }
+                title="Toggle Sorting Mode"
+              >
+                <ArrowUpDown size={12} />
+                <span>
+                  {sortMode === 'PRIORITY_CHRONO' ? 'PRIORITY + TIME' : 'CHRONO ONLY'}
+                </span>
+              </button>
             </div>
 
-            <div className={styles.feedScrollArea}>
+            <div className="flex-1 overflow-y-auto p-3 space-y-2">
               <AnimatePresence initial={false}>
                 {displayedIncidents.length === 0 ? (
-                  <div className={styles.emptyFeedState}>
-                    <AlertCircle size={32} className={styles.emptyIcon} />
-                    <p className={`${styles.emptyText} font-mono`}>
-                      NO MATCHING INCIDENTS TRANSMITTED IN CURRENT FILTER
+                  <div className="flex flex-col items-center justify-center h-full text-zinc-500 gap-3">
+                    <AlertCircle size={24} className="text-zinc-600" />
+                    <p className="text-sm">
+                      No matching incidents found.
                     </p>
                   </div>
                 ) : (
@@ -545,7 +552,7 @@ export function App() {
 
         {/* Right Pane: Sticky Tactical GIS Radar Map */}
         {viewMode !== 'FEED_ONLY' && (
-          <section className={styles.mapPane}>
+          <section className={`rounded-lg border border-zinc-800 overflow-hidden relative ${viewMode === 'SPLIT' ? 'w-2/3' : 'w-full'}`}>
             <TacticalMap
               incidents={displayedIncidents}
               selectedIncidentId={selectedIncidentId}
@@ -554,8 +561,8 @@ export function App() {
             />
           </section>
         )}
-      </main>
-        </>
+      </div>
+        </main>
       )}
 
       {activeView === 'DOCS' && (
