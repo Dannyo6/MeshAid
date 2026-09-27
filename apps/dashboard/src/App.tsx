@@ -405,50 +405,57 @@ export function App() {
 
   return (
     <div className={styles.appContainer}>
-      {/* ── Faint Tactical Animated Grid Background Canvas ── */}
-      <Squares
-        direction="diagonal"
-        speed={0.2}
-        squareSize={40}
-        borderColor="#1a1e29"
-        hoverFillColor="#1e2433"
-      />
-
-      {/* ── Top Header View Switcher ── */}
-      <header className="flex items-center justify-between px-4 py-2 bg-[#090c12]/80 backdrop-blur border-b border-slate-800 z-50 relative shrink-0">
-        <div className="flex items-center gap-2">
-          <div className="flex items-center justify-center w-7 h-7 bg-cyan-900/30 border border-cyan-500/30 rounded-sm">
-            <Radio size={14} className="text-cyan-400" />
-          </div>
-          <span className="text-cyan-400 font-black tracking-widest text-sm uppercase drop-shadow-[0_0_8px_rgba(6,182,212,0.5)] hidden sm:inline">
-            MESHAID
-          </span>
-        </div>
-        <div className="flex bg-[#0f141e] border border-slate-800 rounded p-1 overflow-x-auto hide-scrollbar">
+      {/* ── Top Navigation Bar ── */}
+      <header className="flex items-center justify-between h-14 px-6 border-b border-zinc-800 bg-zinc-950/80 backdrop-blur sticky top-0 z-50">
+        <span className="font-semibold tracking-tight text-zinc-50 text-base">
+          MeshAid
+        </span>
+        <nav className="flex items-center gap-1">
           <button
             onClick={() => setActiveView('RADAR')}
-            className={`whitespace-nowrap px-3 sm:px-4 py-1 text-[10px] sm:text-xs font-bold font-mono transition-colors rounded-sm ${activeView === 'RADAR' ? 'bg-cyan-900/50 text-cyan-400 border border-cyan-800' : 'text-slate-500 hover:text-slate-300 border border-transparent'}`}
+            className={`text-sm font-medium transition-colors px-3 py-1.5 rounded-md ${
+              activeView === 'RADAR'
+                ? 'text-zinc-50 bg-zinc-800/50'
+                : 'text-zinc-400 hover:text-zinc-50'
+            }`}
           >
-            [ 🗺️ C2 RADAR ]
+            C2 Radar
           </button>
           <button
             onClick={() => setActiveView('DOCS')}
-            className={`whitespace-nowrap px-3 sm:px-4 py-1 text-[10px] sm:text-xs font-bold font-mono transition-colors rounded-sm ${activeView === 'DOCS' ? 'bg-amber-900/50 text-amber-400 border border-amber-800' : 'text-slate-500 hover:text-slate-300 border border-transparent'}`}
+            className={`text-sm font-medium transition-colors px-3 py-1.5 rounded-md ${
+              activeView === 'DOCS'
+                ? 'text-zinc-50 bg-zinc-800/50'
+                : 'text-zinc-400 hover:text-zinc-50'
+            }`}
           >
-            [ 📄 PROTOCOL SPEC ]
+            Protocol Spec
           </button>
           <button
             onClick={() => setActiveView('SETUP')}
-            className={`whitespace-nowrap px-3 sm:px-4 py-1 text-[10px] sm:text-xs font-bold font-mono transition-colors rounded-sm ${activeView === 'SETUP' ? 'bg-emerald-900/50 text-emerald-400 border border-emerald-800' : 'text-slate-500 hover:text-slate-300 border border-transparent'}`}
+            className={`text-sm font-medium transition-colors px-3 py-1.5 rounded-md ${
+              activeView === 'SETUP'
+                ? 'text-zinc-50 bg-zinc-800/50'
+                : 'text-zinc-400 hover:text-zinc-50'
+            }`}
           >
-            [ 📱 FIELD APK & SETUP ]
+            Field Setup
           </button>
-        </div>
-        <div className="w-7 hidden sm:block"></div>
+        </nav>
+        <div className="w-16"></div>
       </header>
 
       {activeView === 'RADAR' && (
         <>
+          {/* ── Faint Tactical Animated Grid Background Canvas (RADAR only) ── */}
+          <Squares
+            direction="diagonal"
+            speed={0.2}
+            squareSize={40}
+            borderColor="#1a1e29"
+            hoverFillColor="#1e2433"
+          />
+
           {/* ── Top HUD Operations Strip ── */}
           <TopHud
             connectionState={connectionState}
@@ -552,13 +559,13 @@ export function App() {
       )}
 
       {activeView === 'DOCS' && (
-        <main className="flex-1 flex w-full relative z-10 overflow-hidden">
+        <main className="flex-1 flex w-full relative z-10 overflow-hidden bg-zinc-950">
           <ProtocolDocs />
         </main>
       )}
 
       {activeView === 'SETUP' && (
-        <main className="flex-1 flex w-full relative z-10 overflow-hidden">
+        <main className="flex-1 flex w-full relative z-10 overflow-hidden bg-zinc-950">
           <FieldSetup />
         </main>
       )}

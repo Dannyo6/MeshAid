@@ -7,29 +7,33 @@ export const Footer: React.FC = () => {
 
   return (
     <>
-      <footer className="h-8 border-t border-slate-800 bg-[#080c14] flex items-center justify-between px-4 text-[10px] font-mono text-slate-500 shrink-0 z-40">
-        <div className="flex gap-4">
-          <span className="text-slate-400 font-bold">MESHAID v1.0.0</span>
-          <span className="hidden sm:inline">EDGE-TO-CLOUD DTN GATEWAY</span>
+      <footer className="border-t border-zinc-800 bg-zinc-950 py-6 px-6 flex flex-col md:flex-row items-center justify-between text-xs text-zinc-500 gap-4 shrink-0 z-40">
+        <div className="flex items-center gap-3">
+          <span className="text-zinc-400 font-medium">MeshAid v1.0.0</span>
+          <span className="hidden sm:inline text-zinc-600">·</span>
+          <span className="hidden sm:inline">Edge-to-Cloud DTN Gateway</span>
         </div>
-        
-        <div className="flex gap-3 sm:gap-6">
-          <button onClick={() => setIsPrivacyOpen(true)} className="hover:text-cyan-400 transition-colors">
-            [ PRIVACY POLICY ]
+
+        <div className="flex items-center gap-4">
+          <button onClick={() => setIsPrivacyOpen(true)} className="hover:text-zinc-300 transition-colors">
+            Privacy Policy
           </button>
-          <button onClick={() => setIsRfOpen(true)} className="hover:text-cyan-400 transition-colors">
-            [ RF BROADCAST DISCLAIMER ]
+          <span className="text-zinc-700">·</span>
+          <button onClick={() => setIsRfOpen(true)} className="hover:text-zinc-300 transition-colors">
+            RF Disclaimer
           </button>
-          <a href="https://github.com/Dannyo6/meshaid" target="_blank" rel="noreferrer" className="hover:text-cyan-400 transition-colors hidden md:inline">
-            [ LICENSE ]
+          <span className="text-zinc-700">·</span>
+          <a href="https://github.com/Dannyo6/meshaid" target="_blank" rel="noreferrer" className="hover:text-zinc-300 transition-colors">
+            License
           </a>
         </div>
 
-        <div className="flex items-center gap-2">
-          <span className="hidden sm:inline hover:text-white transition-colors cursor-pointer">
-            <a href="https://github.com/Dannyo6/meshaid" target="_blank" rel="noreferrer">GITHUB REPOSITORY</a>
-          </span>
-          <span className="text-emerald-500 font-bold ml-2">ALL SYSTEMS NOMINAL</span>
+        <div className="flex items-center gap-3">
+          <a href="https://github.com/Dannyo6/meshaid" target="_blank" rel="noreferrer" className="hidden sm:inline hover:text-zinc-300 transition-colors">
+            GitHub
+          </a>
+          <span className="hidden sm:inline text-zinc-700">·</span>
+          <span className="text-emerald-500 font-medium">All systems nominal</span>
         </div>
       </footer>
 
