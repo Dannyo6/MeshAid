@@ -14,6 +14,9 @@ import { IncidentCard } from './components/IncidentCard';
 import { TacticalMap } from './components/TacticalMap';
 import { PacketSimulatorModal } from './components/PacketSimulatorModal';
 import { Squares } from './components/reactbits/Squares';
+import { ProtocolDocs } from './components/ProtocolDocs';
+import { FieldSetup } from './components/FieldSetup';
+import { Footer } from './components/Footer';
 import styles from './App.module.css';
 
 export interface IncidentPayload {
@@ -118,6 +121,7 @@ export function App() {
   const [mobileTab, setMobileTab] = useState<'FEED' | 'MAP' | 'METRICS'>('FEED');
   const [selectedIncidentId, setSelectedIncidentId] = useState<string | null>(null);
   const [isSimulatorOpen, setIsSimulatorOpen] = useState<boolean>(false);
+  const [activeView, setActiveView] = useState<'RADAR' | 'DOCS' | 'SETUP'>('RADAR');
 
   const retryAttemptRef = useRef(0);
   const reconnectTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -412,23 +416,58 @@ export function App() {
         hoverFillColor="#1e2433"
       />
 
-      {/* ── Top HUD Operations Strip ── */}
-      <TopHud
-        connectionState={connectionState}
-        selectedFilter={selectedFilter}
-        onSelectFilter={setSelectedFilter}
-        searchQuery={searchQuery}
-        onSearchChange={setSearchQuery}
-        viewMode={viewMode}
-        onChangeViewMode={setViewMode}
-        onOpenSimulator={() => setIsSimulatorOpen(true)}
-        totalCount={totalIncidents}
-        filteredCount={displayedIncidents.length}
-        p0Count={p0AuthorityCount}
-        p1Count={activeSosCount}
-        p2Count={supplyReqCount}
-        p3Count={p3InfoCount}
-      />
+      {/* ── Top Header View Switcher ── */}
+      <header className="flex items-center justify-between px-4 py-2 bg-[#090c12]/80 backdrop-blur border-b border-slate-800 z-50 relative shrink-0">
+        <div className="flex items-center gap-2">
+          <div className="flex items-center justify-center w-7 h-7 bg-cyan-900/30 border border-cyan-500/30 rounded-sm">
+            <Radio size={14} className="text-cyan-400" />
+          </div>
+          <span className="text-cyan-400 font-black tracking-widest text-sm uppercase drop-shadow-[0_0_8px_rgba(6,182,212,0.5)] hidden sm:inline">
+            MESHAID
+          </span>
+        </div>
+        <div className="flex bg-[#0f141e] border border-slate-800 rounded p-1 overflow-x-auto hide-scrollbar">
+          <button
+            onClick={() => setActiveView('RADAR')}
+            className={`whitespace-nowrap px-3 sm:px-4 py-1 text-[10px] sm:text-xs font-bold font-mono transition-colors rounded-sm ${activeView === 'RADAR' ? 'bg-cyan-900/50 text-cyan-400 border border-cyan-800' : 'text-slate-500 hover:text-slate-300 border border-transparent'}`}
+          >
+            [ 🗺️ C2 RADAR ]
+          </button>
+          <button
+            onClick={() => setActiveView('DOCS')}
+            className={`whitespace-nowrap px-3 sm:px-4 py-1 text-[10px] sm:text-xs font-bold font-mono transition-colors rounded-sm ${activeView === 'DOCS' ? 'bg-amber-900/50 text-amber-400 border border-amber-800' : 'text-slate-500 hover:text-slate-300 border border-transparent'}`}
+          >
+            [ 📄 PROTOCOL SPEC ]
+          </button>
+          <button
+            onClick={() => setActiveView('SETUP')}
+            className={`whitespace-nowrap px-3 sm:px-4 py-1 text-[10px] sm:text-xs font-bold font-mono transition-colors rounded-sm ${activeView === 'SETUP' ? 'bg-emerald-900/50 text-emerald-400 border border-emerald-800' : 'text-slate-500 hover:text-slate-300 border border-transparent'}`}
+          >
+            [ 📱 FIELD APK & SETUP ]
+          </button>
+        </div>
+        <div className="w-7 hidden sm:block"></div>
+      </header>
+
+      {activeView === 'RADAR' && (
+        <>
+          {/* ── Top HUD Operations Strip ── */}
+          <TopHud
+            connectionState={connectionState}
+            selectedFilter={selectedFilter}
+            onSelectFilter={setSelectedFilter}
+            searchQuery={searchQuery}
+            onSearchChange={setSearchQuery}
+            viewMode={viewMode}
+            onChangeViewMode={setViewMode}
+            onOpenSimulator={() => setIsSimulatorOpen(true)}
+            totalCount={totalIncidents}
+            filteredCount={displayedIncidents.length}
+            p0Count={p0AuthorityCount}
+            p1Count={activeSosCount}
+            p2Count={supplyReqCount}
+            p3Count={p3InfoCount}
+          />
 
       {/* ── Global Triage KPI Row ── */}
       <TriageKpiRow
@@ -511,6 +550,20 @@ export function App() {
           </section>
         )}
       </main>
+        </>
+      )}
+
+      {activeView === 'DOCS' && (
+        <main className="flex-1 flex w-full relative z-10 overflow-hidden">
+          <ProtocolDocs />
+        </main>
+      )}
+
+      {activeView === 'SETUP' && (
+        <main className="flex-1 flex w-full relative z-10 overflow-hidden">
+          <FieldSetup />
+        </main>
+      )}
 
       {/* ── Interactive Packet Simulator Slide-Over Drawer ── */}
       <PacketSimulatorModal
@@ -520,43 +573,48 @@ export function App() {
       />
 
       {/* ── Mobile & Rugged Field Tablet Bottom Navigation Dock (< 1024px) ── */}
-      <nav className={styles.mobileNavDock}>
-        <button
-          type="button"
-          className={`${styles.mobileDockBtn} ${mobileTab === 'FEED' ? styles.active : ''}`}
-          onClick={() => {
-            setMobileTab('FEED');
-            setViewMode('FEED_ONLY');
-          }}
-        >
-          <List size={16} />
-          <span>TRANSMISSIONS</span>
-        </button>
+      {activeView === 'RADAR' && (
+        <nav className={styles.mobileNavDock}>
+          <button
+            type="button"
+            className={`${styles.mobileDockBtn} ${mobileTab === 'FEED' ? styles.active : ''}`}
+            onClick={() => {
+              setMobileTab('FEED');
+              setViewMode('FEED_ONLY');
+            }}
+          >
+            <List size={16} />
+            <span>TRANSMISSIONS</span>
+          </button>
 
-        <button
-          type="button"
-          className={`${styles.mobileDockBtn} ${mobileTab === 'MAP' ? styles.active : ''}`}
-          onClick={() => {
-            setMobileTab('MAP');
-            setViewMode('MAP_ONLY');
-          }}
-        >
-          <MapIcon size={16} />
-          <span>GIS RADAR</span>
-        </button>
+          <button
+            type="button"
+            className={`${styles.mobileDockBtn} ${mobileTab === 'MAP' ? styles.active : ''}`}
+            onClick={() => {
+              setMobileTab('MAP');
+              setViewMode('MAP_ONLY');
+            }}
+          >
+            <MapIcon size={16} />
+            <span>GIS RADAR</span>
+          </button>
 
-        <button
-          type="button"
-          className={`${styles.mobileDockBtn} ${mobileTab === 'METRICS' ? styles.active : ''}`}
-          onClick={() => {
-            setMobileTab('METRICS');
-            setViewMode('SPLIT');
-          }}
-        >
-          <BarChart3 size={16} />
-          <span>C2 SPLIT</span>
-        </button>
-      </nav>
+          <button
+            type="button"
+            className={`${styles.mobileDockBtn} ${mobileTab === 'METRICS' ? styles.active : ''}`}
+            onClick={() => {
+              setMobileTab('METRICS');
+              setViewMode('SPLIT');
+            }}
+          >
+            <BarChart3 size={16} />
+            <span>C2 SPLIT</span>
+          </button>
+        </nav>
+      )}
+
+      {/* ── Footer ── */}
+      <Footer />
     </div>
   );
 }
