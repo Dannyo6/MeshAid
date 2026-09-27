@@ -106,10 +106,15 @@ function extractCategory(payloadObj: IncidentPayload, priority: number): string 
 }
 
 export function App() {
+  const API_BASE = import.meta.env.VITE_GATEWAY_URL || '';
+  const WS_BASE = import.meta.env.VITE_GATEWAY_URL 
+    ? import.meta.env.VITE_GATEWAY_URL.replace(/^http/, 'ws')
+    : `${window.location.protocol === 'https:' ? 'wss:' : 'ws:'}//${window.location.host || 'localhost:3000'}`;
+
   const [incidents, setIncidents] = useState<MeshTelemetryRecord[]>([]);
   const [connectionState, setConnectionState] = useState<GatewayConnectionState>({
     status: 'reconnecting',
-    wsUrl: 'ws://localhost:3000',
+    wsUrl: WS_BASE,
     retryAttempt: 0,
     nextRetryMs: 1000,
   });
@@ -131,7 +136,7 @@ export function App() {
   // ── 1. Telemetry Hydration ─────────────────────────────────────────────────
   const hydrateTelemetry = useCallback(async () => {
     const candidateEndpoints = [
-      '/api/mesh/telemetry',
+      API_BASE ? `${API_BASE}/api/mesh/telemetry` : '/api/mesh/telemetry',
       'http://localhost:3000/api/mesh/telemetry',
       'http://localhost:4000/api/mesh/telemetry',
     ];
@@ -186,24 +191,17 @@ export function App() {
       reconnectTimeoutRef.current = null;
     }
 
-    let targetWsUrl = 'ws://localhost:3000';
+    let targetWsUrl = WS_BASE;
     if (typeof window !== 'undefined') {
-      const isHttps = window.location.protocol === 'https:';
-      const wsProto = isHttps ? 'wss:' : 'ws:';
-      const host = window.location.host;
       const params = new URLSearchParams(window.location.search);
       const wsParam = params.get('ws');
 
       if (wsParam) {
         targetWsUrl = wsParam;
-      } else if (window.location.port === '3000') {
-        targetWsUrl = `${wsProto}//${host}`;
-      } else if (window.location.port === '80' || window.location.port === '5173') {
-        targetWsUrl = `${wsProto}//${host}/ws`;
-      } else if (retryAttemptRef.current >= 2 && retryAttemptRef.current % 2 === 0) {
-        targetWsUrl = 'ws://localhost:4000';
-      } else {
-        targetWsUrl = 'ws://localhost:3000';
+      } else if (!import.meta.env.VITE_GATEWAY_URL && window.location.port === '80' || window.location.port === '5173') {
+        const isHttps = window.location.protocol === 'https:';
+        const wsProto = isHttps ? 'wss:' : 'ws:';
+        targetWsUrl = `${wsProto}//${window.location.host}/ws`;
       }
     }
 
