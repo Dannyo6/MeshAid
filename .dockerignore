@@ -1,0 +1,14 @@
+node_modules
+**/node_modules
+dist
+**/dist
+.git
+.github
+.vscode
+apps/mobile
+docs
+*.log
+.env
+.env.local
+.DS_Store
+Thumbs.db

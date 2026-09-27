@@ -5,6 +5,23 @@
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "default": "./dist/index.js"
+    },
+    "./codec.ts": {
+      "types": "./src/codec.ts",
+      "import": "./src/codec.ts",
+      "default": "./src/codec.ts"
+    },
+    "./codec": {
+      "types": "./dist/codec.d.ts",
+      "import": "./dist/codec.js",
+      "default": "./dist/codec.js"
+    }
+  },
   "scripts": {
     "build": "tsc",
     "test": "node --experimental-strip-types --test tests/relay.test.ts tests/codec.test.ts",

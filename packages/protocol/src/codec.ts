@@ -19,6 +19,7 @@
 
 import crypto from 'node:crypto';
 import { Priority } from './types.ts';
+export { Priority } from './types.ts';
 
 export const MAGIC_BYTES = new Uint8Array([0x4d, 0x41]); // "MA"
 export const FIXED_HEADER_SIZE = 96;

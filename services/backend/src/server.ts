@@ -14,7 +14,7 @@ import {
 } from '@meshaid/protocol';
 import type { MeshAidWirePacket } from '@meshaid/protocol';
 
-const PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : 4000;
+const PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : 3000;
 
 export interface MeshTelemetryRecord {
   messageId: string;

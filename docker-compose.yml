@@ -1,0 +1,60 @@
+# ==============================================================================
+# MeshAid Incident Command Base Station - Docker Compose Orchestration
+# Services:
+#   - backend: Gateway Ingestion & Telemetry Service (Port 3000)
+#   - dashboard: Incident Command Telemetry & Map UI via Nginx (Ports 80 & 5173)
+# ==============================================================================
+
+services:
+  backend:
+    build:
+      context: .
+      dockerfile: services/backend/Dockerfile
+    container_name: meshaid-backend
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      DATABASE_URL: sqlite:///app/data/meshaid_telemetry.db
+    volumes:
+      - backend_data:/app/data
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q --spider http://127.0.0.1:3000/health || exit 1"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+      start_period: 5s
+    networks:
+      - meshaid-network
+
+  dashboard:
+    build:
+      context: .
+      dockerfile: apps/dashboard/Dockerfile
+    container_name: meshaid-dashboard
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "5173:80"
+    depends_on:
+      backend:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q --spider http://127.0.0.1:80/healthz || exit 1"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+      start_period: 5s
+    networks:
+      - meshaid-network
+
+volumes:
+  backend_data:
+    name: meshaid_backend_data
+
+networks:
+  meshaid-network:
+    name: meshaid-network
+    driver: bridge
