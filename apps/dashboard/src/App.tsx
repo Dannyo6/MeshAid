@@ -13,6 +13,7 @@ import { TriageKpiRow } from './components/TriageKpiRow';
 import { IncidentCard } from './components/IncidentCard';
 import { TacticalMap } from './components/TacticalMap';
 import { PacketSimulatorModal } from './components/PacketSimulatorModal';
+import { Squares } from './components/reactbits/Squares';
 import styles from './App.module.css';
 
 export interface IncidentPayload {
@@ -402,6 +403,15 @@ export function App() {
 
   return (
     <div className={styles.appContainer}>
+      {/* ── Faint Tactical Animated Grid Background Canvas ── */}
+      <Squares
+        direction="diagonal"
+        speed={0.2}
+        squareSize={40}
+        borderColor="#1a1e29"
+        hoverFillColor="#1e2433"
+      />
+
       {/* ── Top HUD Operations Strip ── */}
       <TopHud
         connectionState={connectionState}

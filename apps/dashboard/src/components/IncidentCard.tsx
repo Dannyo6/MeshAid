@@ -13,7 +13,7 @@ import {
   GitFork,
 } from 'lucide-react';
 import type { MeshTelemetryRecord, IncidentPayload } from '../App';
-import { DecryptedText } from './DecryptedText';
+import { DecryptedText } from './reactbits/DecryptedText';
 import { HexDumpInspector } from './HexDumpInspector';
 
 interface IncidentCardProps {
@@ -199,14 +199,26 @@ export const IncidentCard: React.FC<IncidentCardProps> = ({
         {/* Title Row: Category & Headcount */}
         <div className="incident-title-row font-mono">
           <div className="incident-category-title font-mono">
-            <span>{category}</span>
+            <span>
+              <DecryptedText
+                text={category}
+                characters="0123456789ABCDEF"
+                speed={25}
+                animateOn="mount"
+              />
+            </span>
           </div>
 
           <div className="title-tags-group">
             {headcount !== null && (
               <span className="victim-count-pill font-mono">
                 <Users size={12} />
-                <span>👥 {headcount.toString().padStart(2, '0')} VICTIMS</span>
+                <DecryptedText
+                  text={`👥 ${headcount.toString().padStart(2, '0')} VICTIMS`}
+                  characters="0123456789ABCDEF"
+                  speed={25}
+                  animateOn="mount"
+                />
               </span>
             )}
           </div>
@@ -217,9 +229,11 @@ export const IncidentCard: React.FC<IncidentCardProps> = ({
           <p className="sitrep-text">
             <DecryptedText
               text={details}
-              speed={20}
-              maxIterations={6}
+              characters="0123456789ABCDEF"
+              speed={25}
+              maxIterations={8}
               sequential={true}
+              animateOn="mount"
               className="text-slate-200"
               encryptedClassName="text-cyan-400 font-bold"
             />

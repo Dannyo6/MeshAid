@@ -8,6 +8,8 @@ import {
   TrendingUp,
 } from 'lucide-react';
 import type { MeshTelemetryRecord } from '../App';
+import { CountUp } from './reactbits/CountUp';
+import { SpotlightCard } from './reactbits/SpotlightCard';
 
 interface TriageKpiRowProps {
   incidents: MeshTelemetryRecord[];
@@ -52,7 +54,11 @@ export const TriageKpiRow: React.FC<TriageKpiRowProps> = ({
   return (
     <section className="triage-kpi-grid">
       {/* ── KPI 1: Total Verified Ingest ── */}
-      <div className="kpi-card kpi-ingest">
+      <SpotlightCard
+        spotlightColor="rgba(239, 68, 68, 0.15)"
+        className="kpi-card kpi-ingest"
+        contentStyle={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between', height: '100%' }}
+      >
         <div className="kpi-header">
           <span className="kpi-title font-mono">TOTAL VERIFIED INGEST</span>
           <div className="kpi-icon-wrap text-emerald-400">
@@ -60,7 +66,9 @@ export const TriageKpiRow: React.FC<TriageKpiRowProps> = ({
           </div>
         </div>
         <div className="kpi-value-row">
-          <span className="kpi-number font-mono tabular-nums">{totalIngested}</span>
+          <span className="kpi-number font-mono tabular-nums">
+            <CountUp to={totalIngested} />
+          </span>
           <span className="kpi-unit font-mono">PKTS</span>
         </div>
         <div className="kpi-footer font-mono">
@@ -70,10 +78,14 @@ export const TriageKpiRow: React.FC<TriageKpiRowProps> = ({
           </div>
           <span className="kpi-secondary text-slate-400">GATEWAY DEDUP ACTIVE</span>
         </div>
-      </div>
+      </SpotlightCard>
 
       {/* ── KPI 2: Active P1 Distress Signals ── */}
-      <div className={`kpi-card kpi-p1 ${activeSosCount > 0 ? 'kpi-crimson-alert' : ''}`}>
+      <SpotlightCard
+        spotlightColor="rgba(239, 68, 68, 0.25)"
+        className={`kpi-card kpi-p1 ${activeSosCount > 0 ? 'kpi-crimson-alert' : ''}`}
+        contentStyle={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between', height: '100%' }}
+      >
         <div className="kpi-header">
           <span className="kpi-title font-mono">ACTIVE P1 DISTRESS SIGNALS</span>
           <div className="kpi-icon-wrap text-red-500">
@@ -82,7 +94,7 @@ export const TriageKpiRow: React.FC<TriageKpiRowProps> = ({
         </div>
         <div className="kpi-value-row">
           <span className="kpi-number font-mono tabular-nums text-red-400">
-            {activeSosCount.toString().padStart(2, '0')}
+            <CountUp to={activeSosCount} decimals={0} />
           </span>
           {activeSosCount > 0 && (
             <span className="active-pulse-beacon">
@@ -99,10 +111,14 @@ export const TriageKpiRow: React.FC<TriageKpiRowProps> = ({
           </div>
           <span className="kpi-secondary text-slate-400">IMMEDIATE TRIAGE</span>
         </div>
-      </div>
+      </SpotlightCard>
 
       {/* ── KPI 3: Supply / Logistics Demands ── */}
-      <div className="kpi-card kpi-p2">
+      <SpotlightCard
+        spotlightColor="rgba(239, 68, 68, 0.15)"
+        className="kpi-card kpi-p2"
+        contentStyle={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between', height: '100%' }}
+      >
         <div className="kpi-header">
           <span className="kpi-title font-mono">SUPPLY / LOGISTICS DEMANDS</span>
           <div className="kpi-icon-wrap text-amber-400">
@@ -111,7 +127,7 @@ export const TriageKpiRow: React.FC<TriageKpiRowProps> = ({
         </div>
         <div className="kpi-value-row">
           <span className="kpi-number font-mono tabular-nums text-amber-400">
-            {supplyReqCount.toString().padStart(2, '0')}
+            <CountUp to={supplyReqCount} decimals={0} />
           </span>
           <span className="kpi-unit font-mono text-amber-300/70">REQS</span>
         </div>
@@ -122,10 +138,14 @@ export const TriageKpiRow: React.FC<TriageKpiRowProps> = ({
           </div>
           <span className="kpi-secondary text-slate-400">BLOOD / POWER / MEDS</span>
         </div>
-      </div>
+      </SpotlightCard>
 
       {/* ── KPI 4: Average Mesh Hops & Efficiency ── */}
-      <div className="kpi-card kpi-hops">
+      <SpotlightCard
+        spotlightColor="rgba(239, 68, 68, 0.15)"
+        className="kpi-card kpi-hops"
+        contentStyle={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between', height: '100%' }}
+      >
         <div className="kpi-header">
           <span className="kpi-title font-mono">AVERAGE MESH HOPS</span>
           <div className="kpi-icon-wrap text-cyan-400">
@@ -134,7 +154,7 @@ export const TriageKpiRow: React.FC<TriageKpiRowProps> = ({
         </div>
         <div className="kpi-value-row">
           <span className="kpi-number font-mono tabular-nums text-cyan-400">
-            {averageHops}
+            <CountUp to={avgHopsNum} decimals={1} />
           </span>
           <span className="kpi-unit font-mono text-slate-400">/ 07 MAX</span>
         </div>
@@ -151,7 +171,7 @@ export const TriageKpiRow: React.FC<TriageKpiRowProps> = ({
             <span className="text-cyan-300">DTN STORE-CARRY OK</span>
           </div>
         </div>
-      </div>
+      </SpotlightCard>
     </section>
   );
 };
