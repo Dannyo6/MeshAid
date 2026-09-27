@@ -1,0 +1,10 @@
+services:
+  - type: web
+    name: meshaid-gateway
+    env: node
+    region: oregon
+    plan: free
+    rootDir: services/backend
+    buildCommand: npm install && npm run build
+    startCommand: npm start
+    healthCheckPath: /health
