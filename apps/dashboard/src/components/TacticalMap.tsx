@@ -1,6 +1,15 @@
-import React, { useMemo, useEffect } from 'react';
+import React, { useMemo, useEffect, useState } from 'react';
 import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
 import L from 'leaflet';
+import {
+  Crosshair,
+  ShieldCheck,
+  Users,
+  Ambulance,
+  Package,
+  Copy,
+  Check,
+} from 'lucide-react';
 import type { MeshTelemetryRecord, IncidentPayload } from '../App';
 import './TacticalMap.css';
 
@@ -12,7 +21,6 @@ export interface TacticalMapProps {
   viewTrigger?: unknown;
 }
 
-// Helper to safely parse incident payload
 function parsePayload(payload: IncidentPayload | string): IncidentPayload {
   if (typeof payload === 'string') {
     try {
@@ -28,7 +36,6 @@ function parsePayload(payload: IncidentPayload | string): IncidentPayload {
   return payload || {};
 }
 
-// Extract human-readable details
 function extractDetails(payloadObj: IncidentPayload): string {
   if (payloadObj.details) return String(payloadObj.details);
   if (payloadObj.notes) return String(payloadObj.notes);
@@ -39,7 +46,6 @@ function extractDetails(payloadObj: IncidentPayload): string {
   return 'Situational report broadcasted from offline field node.';
 }
 
-// Extract category/type label
 function extractCategory(payloadObj: IncidentPayload, priority: number): string {
   if (payloadObj.category) return String(payloadObj.category).replace(/_/g, ' ');
   if (payloadObj.type) return String(payloadObj.type).replace(/_/g, ' ');
@@ -57,7 +63,6 @@ function extractCategory(payloadObj: IncidentPayload, priority: number): string 
   }
 }
 
-// Extract headcount
 function extractHeadcount(payloadObj: IncidentPayload): number | null {
   const count =
     payloadObj.headcount ??
@@ -73,7 +78,7 @@ function extractHeadcount(payloadObj: IncidentPayload): number | null {
   return null;
 }
 
-// Cache of Leaflet DivIcons by priority and selection state
+// Marker cache for Leaflet DivIcons
 const markerIconCache: Record<string, L.DivIcon> = {};
 
 function getTacticalMarkerIcon(priority: number, isSelected = false): L.DivIcon {
@@ -97,40 +102,46 @@ function getTacticalMarkerIcon(priority: number, isSelected = false): L.DivIcon 
 
   const selectedClass = isSelected ? ' tactical-pin-selected' : '';
   const isCritical = priority === 0 || priority === 1;
-  const pulseHtml = isCritical ? `<div class="tactical-pulse ${pinClass}"></div>` : '';
+
+  // Custom SVG Multi-Ring Pulsating Radar Beacon for P0 / P1
+  const pulseSvg = isCritical
+    ? `<div class="radar-beacon-rings ${pinClass}">
+         <span class="beacon-wave-1"></span>
+         <span class="beacon-wave-2"></span>
+         <span class="beacon-wave-3"></span>
+       </div>`
+    : '';
 
   const icon = L.divIcon({
     className: 'custom-tactical-marker',
     html: `
       <div class="tactical-marker-container">
-        ${pulseHtml}
+        ${pulseSvg}
         <div class="tactical-pin ${pinClass}${selectedClass}">
-          <span>${badgeLabel}</span>
+          <span class="tactical-pin-label">${badgeLabel}</span>
         </div>
       </div>
     `,
-    iconSize: [32, 32],
-    iconAnchor: [16, 16],
-    popupAnchor: [0, -18],
+    iconSize: [40, 40],
+    iconAnchor: [20, 20],
+    popupAnchor: [0, -22],
   });
 
   markerIconCache[cacheKey] = icon;
   return icon;
 }
 
-/**
- * Controller inside MapContainer to resize and fit markers
- */
 function MapTacticalController({
   points,
+  selectedPosition,
   viewTrigger,
 }: {
   points: [number, number][];
+  selectedPosition?: [number, number] | null;
   viewTrigger?: unknown;
 }) {
   const map = useMap();
 
-  // Invalidate size on mount or when view layout changes
   useEffect(() => {
     const timer = setTimeout(() => {
       map.invalidateSize();
@@ -138,26 +149,33 @@ function MapTacticalController({
     return () => clearTimeout(timer);
   }, [map, viewTrigger]);
 
-  const handleRecenter = () => {
+  useEffect(() => {
+    if (selectedPosition) {
+      map.flyTo(selectedPosition, 16, { duration: 1.2 });
+    }
+  }, [map, selectedPosition]);
+
+  const handleRecenterAll = () => {
     if (points.length === 0) {
       map.setView([12.9716, 77.5946], 13);
     } else if (points.length === 1) {
       map.setView(points[0], 15);
     } else {
       const bounds = L.latLngBounds(points);
-      map.fitBounds(bounds, { padding: [50, 50], maxZoom: 16 });
+      map.fitBounds(bounds, { padding: [60, 60], maxZoom: 16 });
     }
   };
 
   return (
-    <div className="tactical-map-actions">
+    <div className="tactical-map-controls">
       <button
         type="button"
-        className="tactical-recenter-btn"
-        onClick={handleRecenter}
-        title="Fit all active GPS incidents"
+        className="tactical-map-recenter-btn font-mono"
+        onClick={handleRecenterAll}
+        title="Fit all active GPS transmissions in viewport"
       >
-        🎯 Recenter ({points.length})
+        <Crosshair size={13} />
+        <span>RECENTER RADAR ({points.length})</span>
       </button>
     </div>
   );
@@ -170,7 +188,9 @@ export const TacticalMap: React.FC<TacticalMapProps> = ({
   className = '',
   viewTrigger,
 }) => {
-  // Filter for valid GPS coordinates (not null and not NaN and within bounds)
+  const [copiedSitrepId, setCopiedSitrepId] = useState<string | null>(null);
+  const [dispatchStatus, setDispatchStatus] = useState<string | null>(null);
+
   const validIncidents = useMemo(() => {
     return incidents.filter((inc) => {
       const lat = inc.lat;
@@ -188,30 +208,55 @@ export const TacticalMap: React.FC<TacticalMapProps> = ({
     });
   }, [incidents]);
 
-  // Points array for centroid and bounds fitting
   const points = useMemo<[number, number][]>(() => {
     return validIncidents.map((inc) => [inc.lat as number, inc.lng as number]);
   }, [validIncidents]);
 
-  // Default initial center: centroid of incidents or default command center
+  const selectedPosition = useMemo<[number, number] | null>(() => {
+    if (!selectedIncidentId) return null;
+    const match = validIncidents.find((i) => i.messageId === selectedIncidentId);
+    if (match && typeof match.lat === 'number' && typeof match.lng === 'number') {
+      return [match.lat, match.lng];
+    }
+    return null;
+  }, [selectedIncidentId, validIncidents]);
+
   const initialCenter: [number, number] = useMemo(() => {
     if (points.length === 0) {
-      return [12.9716, 77.5946]; // Default tactical center (Bengaluru Command Center)
+      return [12.9716, 77.5946]; // Bengaluru Incident Hub Command Center
     }
     const sumLat = points.reduce((acc, p) => acc + p[0], 0);
     const sumLng = points.reduce((acc, p) => acc + p[1], 0);
     return [sumLat / points.length, sumLng / points.length];
   }, [points]);
 
+  const handleCopySitrep = (id: string, text: string) => {
+    navigator.clipboard?.writeText(text);
+    setCopiedSitrepId(id);
+    setTimeout(() => setCopiedSitrepId(null), 2000);
+  };
+
+  const handleDispatch = (type: string, id: string) => {
+    setDispatchStatus(`DISPATCH ORDER ISSUED: ${type} -> INCIDENT #${id.slice(0, 8)}`);
+    setTimeout(() => setDispatchStatus(null), 3000);
+  };
+
   return (
     <div className={`tactical-map-wrapper ${className}`}>
-      {/* Top Header Controls Overlay */}
+      {/* Top Header Tactical Overlay */}
       <div className="tactical-map-header">
-        <div className="tactical-map-badge">
-          <span className="tactical-map-dot" />
-          <span>TACTICAL GIS RADAR</span>
-          <span style={{ color: '#38bdf8' }}>({validIncidents.length} Mapped)</span>
+        <div className="tactical-map-badge font-mono">
+          <span className="radar-sweep-icon" />
+          <span className="map-badge-title">TACTICAL GIS RADAR</span>
+          <span className="map-badge-divider">//</span>
+          <span className="map-badge-count">{validIncidents.length} NODES MAPPED</span>
         </div>
+
+        {dispatchStatus && (
+          <div className="map-dispatch-notification font-mono animate-pulse">
+            {dispatchStatus}
+          </div>
+        )}
       </div>
 
       <MapContainer
@@ -220,16 +265,18 @@ export const TacticalMap: React.FC<TacticalMapProps> = ({
         scrollWheelZoom={true}
         className="tactical-map-container"
       >
-        {/* Dark-mode CartoDB tile layer */}
         <TileLayer
           attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>'
           url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
           maxZoom={19}
         />
 
-        <MapTacticalController points={points} viewTrigger={viewTrigger} />
+        <MapTacticalController
+          points={points}
+          selectedPosition={selectedPosition}
+          viewTrigger={viewTrigger}
+        />
 
-        {/* Dynamic Markers for each valid incident */}
         {validIncidents.map((incident) => {
           const payloadObj = parsePayload(incident.payload);
           const details = extractDetails(payloadObj);
@@ -251,47 +298,93 @@ export const TacticalMap: React.FC<TacticalMapProps> = ({
               }}
             >
               <Popup>
-                <div className="tactical-popup">
-                  {/* Header: Priority Badge + Cryptographic Verified Shield */}
+                <div className="tactical-popup font-mono">
+                  {/* Popup Header */}
                   <div className="tactical-popup-header">
-                    <span className={`tactical-popup-badge-p${incident.priority}`}>
+                    <span className={`popup-badge-p${incident.priority}`}>
                       {incident.priority === 0
-                        ? 'P0 AUTHORITY'
+                        ? '[P0:AUTHORITY]'
                         : incident.priority === 1
-                          ? 'P1 SOS'
+                          ? '[P1:CRIT-SOS]'
                           : incident.priority === 2
-                            ? 'P2 SUPPLIES'
-                            : 'P3 INFO'}
+                            ? '[P2:SUPPLIES]'
+                            : '[P3:INTEL]'}
                     </span>
-                    <span
-                      className="tactical-popup-shield"
-                      title="Decoded from Ed25519 digitally signed wire frame. Authenticity verified."
-                    >
-                      🛡️ Ed25519 Verified
+                    <span className="popup-verified-tag">
+                      <ShieldCheck size={11} className="text-emerald-400" />
+                      <span>ED25519 VERIFIED</span>
                     </span>
                   </div>
 
-                  {/* Title: Emergency Type & Headcount */}
+                  {/* Incident Title & Victims */}
                   <div className="tactical-popup-title-row">
-                    <span className="tactical-popup-type">{category}</span>
+                    <span className="popup-title">{category}</span>
                     {headcount !== null && (
-                      <span className="tactical-popup-headcount" title="Persons at risk">
-                        👥 {headcount} {headcount === 1 ? 'victim' : 'victims'}
+                      <span className="popup-victim-badge">
+                        <Users size={11} />
+                        <span>{headcount} {headcount === 1 ? 'VICTIM' : 'VICTIMS'}</span>
                       </span>
                     )}
                   </div>
 
                   {/* Situation Report Snippet */}
-                  <p className="tactical-popup-snippet">{details}</p>
+                  <div className="popup-snippet-box">
+                    <p className="popup-snippet">{details}</p>
+                  </div>
 
-                  {/* Meta: Hop Count & GPS Coordinates */}
-                  <div className="tactical-popup-meta">
+                  {/* Geo & Hops Meta */}
+                  <div className="popup-meta-row tabular-nums">
+                    <span>HOP: 0{incident.hopCount}/07</span>
                     <span>
-                      🔀 {incident.hopCount} {incident.hopCount === 1 ? 'hop' : 'hops'}
+                      {Number(incident.lat).toFixed(4)}°N, {Number(incident.lng).toFixed(4)}°E
                     </span>
-                    <span>
-                      📍 {Number(incident.lat).toFixed(4)}°, {Number(incident.lng).toFixed(4)}°
-                    </span>
+                  </div>
+
+                  {/* Tactical Field Action Shortcuts */}
+                  <div className="popup-dispatch-actions">
+                    <button
+                      type="button"
+                      className="popup-dispatch-btn btn-med"
+                      onClick={() => handleDispatch('AIR-MEDEVAC', incident.messageId)}
+                      title="Issue Medevac order"
+                    >
+                      <Ambulance size={11} />
+                      <span>DISPATCH MED-EVAC</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      className="popup-dispatch-btn btn-relief"
+                      onClick={() => handleDispatch('SUPPLY RELIEF', incident.messageId)}
+                      title="Issue supply relay order"
+                    >
+                      <Package size={11} />
+                      <span>DISPATCH RELIEF</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      className="popup-dispatch-btn btn-copy"
+                      onClick={() =>
+                        handleCopySitrep(
+                          incident.messageId,
+                          `[MESHAID C2 SITREP] ${category} @ ${Number(incident.lat).toFixed(4)}, ${Number(incident.lng).toFixed(4)} - ${details}`
+                        )
+                      }
+                      title="Copy Incident SITREP to Clipboard"
+                    >
+                      {copiedSitrepId === incident.messageId ? (
+                        <>
+                          <Check size={11} className="text-emerald-400" />
+                          <span>COPIED</span>
+                        </>
+                      ) : (
+                        <>
+                          <Copy size={11} />
+                          <span>COPY SITREP</span>
+                        </>
+                      )}
+                    </button>
                   </div>
                 </div>
               </Popup>
@@ -301,8 +394,8 @@ export const TacticalMap: React.FC<TacticalMapProps> = ({
       </MapContainer>
 
       {validIncidents.length === 0 && (
-        <div className="tactical-map-empty">
-          ⚠️ No active GPS coordinates in current transmission feed
+        <div className="tactical-map-empty font-mono">
+          <span>⚠️ NO GEOLOCATED RF TRANSMISSIONS RECORDED IN CURRENT SECTOR</span>
         </div>
       )}
     </div>

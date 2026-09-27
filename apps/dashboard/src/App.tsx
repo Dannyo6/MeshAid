@@ -1,10 +1,20 @@
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
+import { AnimatePresence } from 'framer-motion';
+import {
+  List,
+  Map as MapIcon,
+  BarChart3,
+  Radio,
+  AlertCircle,
+  ArrowUpDown,
+} from 'lucide-react';
+import { TopHud } from './components/TopHud';
+import { TriageKpiRow } from './components/TriageKpiRow';
+import { IncidentCard } from './components/IncidentCard';
 import { TacticalMap } from './components/TacticalMap';
+import { PacketSimulatorModal } from './components/PacketSimulatorModal';
 import styles from './App.module.css';
 
-/**
- * Decoded payload within an emergency telemetry record.
- */
 export interface IncidentPayload {
   category?: string;
   type?: string;
@@ -22,9 +32,6 @@ export interface IncidentPayload {
   [key: string]: unknown;
 }
 
-/**
- * Core Mesh Telemetry Record ingested from wire packets by the gateway server.
- */
 export interface MeshTelemetryRecord {
   messageId: string;
   priority: number; // 0 = P0 Authority, 1 = P1 SOS, 2 = P2 Supplies, 3 = P3 Info
@@ -36,9 +43,6 @@ export interface MeshTelemetryRecord {
   receivedAt?: number;
 }
 
-/**
- * Gateway WebSocket live connection state.
- */
 export type ConnectionStatus = 'connected' | 'reconnecting';
 
 export interface GatewayConnectionState {
@@ -48,7 +52,6 @@ export interface GatewayConnectionState {
   nextRetryMs: number;
 }
 
-// Priority constants matching @meshaid/protocol
 export const Priority = {
   EMERGENCY_AUTHORITY: 0,
   CIVILIAN_SOS: 1,
@@ -56,9 +59,6 @@ export const Priority = {
   GENERAL_INFO: 3,
 } as const;
 
-/**
- * Safe helper to normalize and parse decoded payload objects.
- */
 function parsePayload(payload: IncidentPayload | string): IncidentPayload {
   if (typeof payload === 'string') {
     try {
@@ -74,30 +74,6 @@ function parsePayload(payload: IncidentPayload | string): IncidentPayload {
   return payload || {};
 }
 
-/**
- * Extract headcount / persons at risk from various payload variations.
- */
-function extractHeadcount(payloadObj: IncidentPayload): number | null {
-  const count =
-    payloadObj.headcount ??
-    payloadObj.headCount ??
-    payloadObj.injuredCount ??
-    payloadObj.victimCount ??
-    payloadObj.count;
-
-  if (typeof count === 'number' && !Number.isNaN(count) && count > 0) {
-    return count;
-  }
-  if (typeof count === 'string') {
-    const parsed = parseInt(count, 10);
-    if (!Number.isNaN(parsed) && parsed > 0) return parsed;
-  }
-  return null;
-}
-
-/**
- * Extract human-readable situational emergency details from payload.
- */
 function extractDetails(payloadObj: IncidentPayload): string {
   if (payloadObj.details) return String(payloadObj.details);
   if (payloadObj.notes) return String(payloadObj.notes);
@@ -105,21 +81,12 @@ function extractDetails(payloadObj: IncidentPayload): string {
   if (payloadObj.situation) return String(payloadObj.situation);
   if (payloadObj.text) return String(payloadObj.text);
   if (payloadObj.category) return String(payloadObj.category);
-
-  const keys = Object.keys(payloadObj).filter((k) => k !== 'publicKey' && k !== 'type');
-  if (keys.length > 0) {
-    return keys.map((k) => `${k}: ${String(payloadObj[k])}`).join(' | ');
-  }
   return 'Situational report broadcasted from offline field node.';
 }
 
-/**
- * Extract category or triage title.
- */
 function extractCategory(payloadObj: IncidentPayload, priority: number): string {
   if (payloadObj.category) return String(payloadObj.category).replace(/_/g, ' ');
   if (payloadObj.type) return String(payloadObj.type).replace(/_/g, ' ');
-
   switch (priority) {
     case Priority.EMERGENCY_AUTHORITY:
       return 'AUTHORITY ALERT';
@@ -132,42 +99,6 @@ function extractCategory(payloadObj: IncidentPayload, priority: number): string 
     default:
       return 'EMERGENCY DISPATCH';
   }
-}
-
-/**
- * Format timestamp to relative human time (e.g. '2s ago', '5m ago').
- */
-function formatRelativeTime(timestampSecondsOrMs: number): string {
-  const timestampMs =
-    timestampSecondsOrMs < 10000000000 ? timestampSecondsOrMs * 1000 : timestampSecondsOrMs;
-  const elapsedSec = Math.max(0, Math.floor((Date.now() - timestampMs) / 1000));
-
-  if (elapsedSec < 5) return 'just now';
-  if (elapsedSec < 60) return `${elapsedSec}s ago`;
-  const minutes = Math.floor(elapsedSec / 60);
-  if (minutes < 60) return `${minutes}m ago`;
-  const hours = Math.floor(minutes / 60);
-  if (hours < 24) return `${hours}h ago`;
-  const days = Math.floor(hours / 24);
-  return `${days}d ago`;
-}
-
-/**
- * Format timestamp to UTC string.
- */
-function formatUtcTime(timestampSecondsOrMs: number): string {
-  const timestampMs =
-    timestampSecondsOrMs < 10000000000 ? timestampSecondsOrMs * 1000 : timestampSecondsOrMs;
-  return new Date(timestampMs).toISOString().replace('T', ' ').replace(/\.\d+Z$/, ' UTC');
-}
-
-/**
- * Format raw epoch value for telemetry badge.
- */
-function formatEpoch(timestampSecondsOrMs: number): number {
-  return timestampSecondsOrMs < 10000000000
-    ? timestampSecondsOrMs
-    : Math.floor(timestampSecondsOrMs / 1000);
 }
 
 export function App() {
@@ -183,18 +114,17 @@ export function App() {
   const [searchQuery, setSearchQuery] = useState('');
   const [sortMode, setSortMode] = useState<'PRIORITY_CHRONO' | 'PURE_CHRONO'>('PRIORITY_CHRONO');
   const [viewMode, setViewMode] = useState<'SPLIT' | 'FEED_ONLY' | 'MAP_ONLY'>('SPLIT');
+  const [mobileTab, setMobileTab] = useState<'FEED' | 'MAP' | 'METRICS'>('FEED');
   const [selectedIncidentId, setSelectedIncidentId] = useState<string | null>(null);
-  const [expandedPayloadIds, setExpandedPayloadIds] = useState<Set<string>>(new Set());
-  const [copiedId, setCopiedId] = useState<string | null>(null);
+  const [isSimulatorOpen, setIsSimulatorOpen] = useState<boolean>(false);
 
   const retryAttemptRef = useRef(0);
   const reconnectTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const wsRef = useRef<WebSocket | null>(null);
   const isComponentMounted = useRef(true);
 
-  // ── 1. Initial State Hydration ─────────────────────────────────────────────
+  // ── 1. Telemetry Hydration ─────────────────────────────────────────────────
   const hydrateTelemetry = useCallback(async () => {
-    // Try relative endpoint first, then direct localhost targets if dev proxy not active
     const candidateEndpoints = [
       '/api/mesh/telemetry',
       'http://localhost:3000/api/mesh/telemetry',
@@ -226,10 +156,10 @@ export function App() {
               return Array.from(existingMap.values());
             });
           }
-          break; // successfully fetched from this endpoint
+          break;
         }
       } catch {
-        // Continue to fallback candidates
+        // Fallback to next candidate
       }
     }
   }, []);
@@ -237,31 +167,25 @@ export function App() {
   useEffect(() => {
     isComponentMounted.current = true;
     hydrateTelemetry();
-
     return () => {
       isComponentMounted.current = false;
     };
   }, [hydrateTelemetry]);
 
-  // ── 2. WebSocket Streaming & Exponential Backoff Reconnection ──────────────
+  // ── 2. WebSocket Streaming & Reconnection ──────────────────────────────────
   const connectWebSocket = useCallback(() => {
     if (!isComponentMounted.current) return;
 
-    // Clear any pending reconnect timer
     if (reconnectTimeoutRef.current) {
       clearTimeout(reconnectTimeoutRef.current);
       reconnectTimeoutRef.current = null;
     }
 
-    // Determine target WebSocket URL:
-    // User requirement: "ws://localhost:3000 (or dynamic window.location.host)"
     let targetWsUrl = 'ws://localhost:3000';
     if (typeof window !== 'undefined') {
       const isHttps = window.location.protocol === 'https:';
       const wsProto = isHttps ? 'wss:' : 'ws:';
       const host = window.location.host;
-
-      // Check for explicit query param override (?ws=ws://...)
       const params = new URLSearchParams(window.location.search);
       const wsParam = params.get('ws');
 
@@ -269,8 +193,9 @@ export function App() {
         targetWsUrl = wsParam;
       } else if (window.location.port === '3000') {
         targetWsUrl = `${wsProto}//${host}`;
+      } else if (window.location.port === '80' || window.location.port === '5173') {
+        targetWsUrl = `${wsProto}//${host}/ws`;
       } else if (retryAttemptRef.current >= 2 && retryAttemptRef.current % 2 === 0) {
-        // Resilient fallback: If port 3000 failed several times, rotate candidate
         targetWsUrl = 'ws://localhost:4000';
       } else {
         targetWsUrl = 'ws://localhost:3000';
@@ -313,7 +238,6 @@ export function App() {
 
         try {
           const parsed = JSON.parse(event.data);
-          // Check for EVENT_NEW_INCIDENT event wrapper or direct payload
           if (
             parsed.event === 'EVENT_NEW_INCIDENT' ||
             parsed.type === 'EVENT_NEW_INCIDENT' ||
@@ -332,10 +256,9 @@ export function App() {
                 receivedAt: rawRecord.receivedAt ?? Date.now(),
               };
 
-              // Prepend newly received record and deduplicate by messageId
               setIncidents((prev) => {
                 if (prev.some((item) => item.messageId === newRecord.messageId)) {
-                  return prev; // Deduplicate
+                  return prev;
                 }
                 return [newRecord, ...prev];
               });
@@ -347,7 +270,6 @@ export function App() {
       };
 
       socket.onerror = () => {
-        // WebSocket error event: close will trigger reconnect backoff
         try {
           socket.close();
         } catch {
@@ -357,8 +279,6 @@ export function App() {
 
       socket.onclose = () => {
         if (!isComponentMounted.current) return;
-
-        // Exponential backoff reconnect: 1s -> 2s -> 4s -> 8s -> 16s -> 30s max
         const backoffMs = Math.min(1000 * Math.pow(2, retryAttemptRef.current), 30000);
         retryAttemptRef.current += 1;
 
@@ -376,7 +296,6 @@ export function App() {
     } catch {
       const backoffMs = Math.min(1000 * Math.pow(2, retryAttemptRef.current), 30000);
       retryAttemptRef.current += 1;
-
       reconnectTimeoutRef.current = setTimeout(() => {
         connectWebSocket();
       }, backoffMs);
@@ -385,7 +304,6 @@ export function App() {
 
   useEffect(() => {
     connectWebSocket();
-
     return () => {
       if (reconnectTimeoutRef.current) {
         clearTimeout(reconnectTimeoutRef.current);
@@ -400,23 +318,23 @@ export function App() {
     };
   }, [connectWebSocket]);
 
-  // ── 3. Global Incident Telemetry Counters ──────────────────────────────────
+  // ── 3. KPI Statistics ──────────────────────────────────────────────────────
   const totalIncidents = incidents.length;
   const activeSosCount = useMemo(
     () => incidents.filter((i) => i.priority === Priority.CIVILIAN_SOS).length,
-    [incidents],
+    [incidents]
   );
   const supplyReqCount = useMemo(
     () => incidents.filter((i) => i.priority === Priority.RESOURCE_LOGISTICS).length,
-    [incidents],
+    [incidents]
   );
   const p0AuthorityCount = useMemo(
     () => incidents.filter((i) => i.priority === Priority.EMERGENCY_AUTHORITY).length,
-    [incidents],
+    [incidents]
   );
   const p3InfoCount = useMemo(
     () => incidents.filter((i) => i.priority === Priority.GENERAL_INFO).length,
-    [incidents],
+    [incidents]
   );
 
   const averageRelayHops = useMemo(() => {
@@ -425,647 +343,210 @@ export function App() {
     return (sum / incidents.length).toFixed(1);
   }, [incidents]);
 
-  // ── 4. Sorted & Filtered Incident Stream ───────────────────────────────────
+  // ── 4. Filtering & Sorting ─────────────────────────────────────────────────
   const displayedIncidents = useMemo(() => {
     let list = incidents;
 
-    // Priority tier filter
     if (selectedFilter !== 'ALL') {
       list = list.filter((i) => i.priority === selectedFilter);
     }
 
-    // Text search filter
     if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase().trim();
       list = list.filter((i) => {
         const payloadObj = parsePayload(i.payload);
         const details = extractDetails(payloadObj).toLowerCase();
-        const category = extractCategory(payloadObj, i.priority).toLowerCase();
+        const cat = extractCategory(payloadObj, i.priority).toLowerCase();
         const idMatch = i.messageId.toLowerCase().includes(q);
         const latMatch = i.lat !== null && String(i.lat).includes(q);
         const lngMatch = i.lng !== null && String(i.lng).includes(q);
 
-        return idMatch || details.includes(q) || category.includes(q) || latMatch || lngMatch;
+        return idMatch || details.includes(q) || cat.includes(q) || latMatch || lngMatch;
       });
     }
 
-    // Sorting: Chronologically and Prioritized
     if (sortMode === 'PRIORITY_CHRONO') {
       return [...list].sort((a, b) => {
-        // Priority ascending (0: P0 highest -> 3: P3 lowest)
         if (a.priority !== b.priority) {
           return a.priority - b.priority;
         }
-        // Matching priority: most recent timestamp first
         return b.timestamp - a.timestamp;
       });
     } else {
-      // Pure Chronological: newest received first
       return [...list].sort((a, b) => b.timestamp - a.timestamp);
     }
   }, [incidents, selectedFilter, searchQuery, sortMode]);
 
-  // Toggle raw payload inspector
-  const togglePayloadExpand = (id: string) => {
-    setExpandedPayloadIds((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) {
-        next.delete(id);
-      } else {
-        next.add(id);
-      }
-      return next;
+  // Focus map on selected incident
+  const handleFocusMap = (incident: MeshTelemetryRecord) => {
+    setSelectedIncidentId(incident.messageId);
+    if (typeof window !== 'undefined' && window.innerWidth < 1024) {
+      setMobileTab('MAP');
+    }
+  };
+
+  const handleInjectSimulatedIncident = (incident: MeshTelemetryRecord) => {
+    setIncidents((prev) => {
+      if (prev.some((i) => i.messageId === incident.messageId)) return prev;
+      return [incident, ...prev];
     });
+    setSelectedIncidentId(incident.messageId);
   };
 
-  // Copy Message ID helper
-  const copyMessageId = (id: string) => {
-    if (navigator?.clipboard?.writeText) {
-      navigator.clipboard.writeText(id);
-      setCopiedId(id);
-      setTimeout(() => setCopiedId(null), 2000);
-    }
-  };
-
-  // ── 5. Simulation Tool (for Testing & Demonstration) ───────────────────────
-  const simulateInboundIncident = (tier?: number) => {
-    const randomHex = Array.from({ length: 8 }, () =>
-      Math.floor(Math.random() * 256)
-        .toString(16)
-        .padStart(2, '0'),
-    ).join('');
-
-    const targetPriority =
-      tier !== undefined
-        ? tier
-        : [
-            Priority.EMERGENCY_AUTHORITY,
-            Priority.CIVILIAN_SOS,
-            Priority.RESOURCE_LOGISTICS,
-            Priority.GENERAL_INFO,
-          ][Math.floor(Math.random() * 4)];
-
-    const nowSec = Math.floor(Date.now() / 1000);
-
-    let samplePayload: IncidentPayload;
-    let lat: number | null = 12.9716;
-    let lng: number | null = 77.5946;
-
-    if (targetPriority === Priority.EMERGENCY_AUTHORITY) {
-      samplePayload = {
-        category: 'DAM_BREACH_EVACUATION',
-        details: 'Immediate evacuation directive: Upstream reservoir overflow imminent in Sector 4.',
-        headcount: 140,
-        type: 'EMERGENCY',
-      };
-      lat = 12.9815;
-      lng = 77.6042;
-    } else if (targetPriority === Priority.CIVILIAN_SOS) {
-      samplePayload = {
-        category: 'COLLAPSED_STRUCTURE_SOS',
-        details: 'Civilians trapped under collapsed roof rubble. Urgent extrication required.',
-        headcount: 3,
-        injuredCount: 2,
-        type: 'SOS',
-      };
-      lat = 12.9654;
-      lng = 77.5891;
-    } else if (targetPriority === Priority.RESOURCE_LOGISTICS) {
-      samplePayload = {
-        category: 'MEDICAL_LOGISTICS_REQ',
-        details: 'Urgent need for 10 units O-Negative blood and portable diesel generator fuel.',
-        headcount: 1,
-        type: 'RESOURCE_REQ',
-      };
-      lat = 12.9789;
-      lng = 77.5912;
-    } else {
-      samplePayload = {
-        category: 'ROAD_STATUS_UPDATE',
-        details: 'Bridge over North River cleared for emergency 4x4 relief vehicles.',
-        type: 'BULLETIN',
-      };
-      lat = 12.9542;
-      lng = 77.6105;
-    }
-
-    const testIncident: MeshTelemetryRecord = {
-      messageId: randomHex,
-      priority: targetPriority,
-      hopCount: Math.floor(Math.random() * 4) + 1,
-      timestamp: nowSec,
-      lat,
-      lng,
-      payload: samplePayload,
-      receivedAt: Date.now(),
-    };
-
-    setIncidents((prev) => [testIncident, ...prev]);
-  };
+  const layoutClass =
+    viewMode === 'SPLIT'
+      ? styles.splitLayout
+      : viewMode === 'FEED_ONLY'
+        ? styles.feedOnlyLayout
+        : styles.mapOnlyLayout;
 
   return (
-    <div className={styles.dashboard}>
-      {/* ── Header Bar ── */}
-      <header className={styles.header}>
-        <div className={styles.headerInner}>
-          {/* Brand Branding */}
-          <div className={styles.brandingGroup}>
-            <div className={styles.radarIconBox} title="MeshAid Opportunistic Relay Network">
-              <div className={styles.radarSweep} />
-              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#38bdf8" strokeWidth="2.2">
-                <circle cx="12" cy="12" r="10" />
-                <path d="M12 2a14.5 14.5 0 0 0 0 20M12 2a14.5 14.5 0 0 1 0 20M2 12h20" />
-              </svg>
-            </div>
-            <div className={styles.titleArea}>
-              <div className={styles.brandTitleRow}>
-                <h1 className={styles.brandTitle}>
-                  Mesh<span className={styles.brandTitleAccent}>Aid</span> Command Center
-                </h1>
-                <span className={styles.brandPill}>DTN GATEWAY</span>
+    <div className={styles.appContainer}>
+      {/* ── Top HUD Operations Strip ── */}
+      <TopHud
+        connectionState={connectionState}
+        selectedFilter={selectedFilter}
+        onSelectFilter={setSelectedFilter}
+        searchQuery={searchQuery}
+        onSearchChange={setSearchQuery}
+        viewMode={viewMode}
+        onChangeViewMode={setViewMode}
+        onOpenSimulator={() => setIsSimulatorOpen(true)}
+        totalCount={totalIncidents}
+        filteredCount={displayedIncidents.length}
+        p0Count={p0AuthorityCount}
+        p1Count={activeSosCount}
+        p2Count={supplyReqCount}
+        p3Count={p3InfoCount}
+      />
+
+      {/* ── Global Triage KPI Row ── */}
+      <TriageKpiRow
+        incidents={incidents}
+        totalIngested={totalIncidents}
+        activeSosCount={activeSosCount}
+        supplyReqCount={supplyReqCount}
+        averageHops={averageRelayHops}
+      />
+
+      {/* ── Main Viewport Grid (Split / Feed Only / Map Only) ── */}
+      <main className={`${styles.mainViewport} ${layoutClass}`}>
+        {/* Left Pane: Incident Telemetry Stream */}
+        {viewMode !== 'MAP_ONLY' && (
+          <section className={styles.feedPane}>
+            <div className={styles.feedHeaderBar}>
+              <div className={styles.feedHeaderLeft}>
+                <Radio size={13} className="text-cyan-400" />
+                <span className={`${styles.feedTitle} font-mono`}>
+                  TACTICAL TRANSMISSION FEED
+                </span>
+                <span className={`${styles.feedCountBadge} font-mono tabular-nums`}>
+                  {displayedIncidents.length} / {totalIncidents}
+                </span>
               </div>
-              <span className={styles.brandSubtitle}>
-                Real-Time Opportunistic Mesh Telemetry & Incident Dispatch
-              </span>
-            </div>
-          </div>
 
-          {/* Connection Status & Actions */}
-          <div className={styles.headerControls}>
-            {/* Live Gateway Connection Badge */}
-            <div
-              className={`${styles.connectionBadge} ${
-                connectionState.status === 'connected'
-                  ? styles.connectionConnected
-                  : styles.connectionReconnecting
-              }`}
-              title={`Gateway target: ${connectionState.wsUrl}`}
-            >
-              <span
-                className={`${styles.statusDot} ${
-                  connectionState.status === 'connected'
-                    ? styles.dotConnected
-                    : styles.dotReconnecting
-                }`}
-              />
-              <span>
-                {connectionState.status === 'connected'
-                  ? 'Connected'
-                  : `Reconnecting (retry #${connectionState.retryAttempt})`}
-              </span>
-              <span className={styles.wsEndpointLabel}>
-                {connectionState.wsUrl.replace(/^wss?:\/\//, '')}
-              </span>
-            </div>
-
-            {/* Manual Sync / Refresh */}
-            <button
-              type="button"
-              className={styles.btnIcon}
-              onClick={hydrateTelemetry}
-              title="Poll telemetry REST endpoint"
-            >
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-                <path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67" />
-              </svg>
-              Sync
-            </button>
-
-            {/* Inbound Simulator */}
-            <button
-              type="button"
-              className={`${styles.btnIcon} ${styles.btnSimulate}`}
-              onClick={() => simulateInboundIncident()}
-              title="Inject simulated signed wire packet into feed"
-            >
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-                <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" />
-              </svg>
-              Simulate Packet
-            </button>
-          </div>
-        </div>
-      </header>
-
-      {/* ── Main Command Body ── */}
-      <main className={styles.main}>
-        {/* Global Incident Telemetry Counters */}
-        <section className={styles.statsGrid}>
-          {/* 1. Total Incidents */}
-          <div className={`${styles.statCard} ${styles.statTotal}`}>
-            <div className={styles.statCardTop}>
-              <span className={styles.statLabel}>Total Incidents</span>
-              <span className={styles.statIcon}>📡</span>
-            </div>
-            <div className={styles.statValue}>{totalIncidents}</div>
-            <div className={styles.statSubtext}>Verified Mesh Telemetry Records</div>
-          </div>
-
-          {/* 2. Active SOS (P1) */}
-          <div
-            className={`${styles.statCard} ${styles.statSos} ${
-              activeSosCount > 0 ? styles.statSosActive : ''
-            }`}
-          >
-            <div className={styles.statCardTop}>
-              <span className={styles.statLabel}>Active SOS (P1)</span>
-              <span className={styles.statIcon}>🚨</span>
-            </div>
-            <div className={styles.statValue}>{activeSosCount}</div>
-            <div className={styles.statSubtext}>Life-Threatening Distress Signals</div>
-          </div>
-
-          {/* 3. Supply Requests (P2) */}
-          <div className={`${styles.statCard} ${styles.statSupplies}`}>
-            <div className={styles.statCardTop}>
-              <span className={styles.statLabel}>Supply Requests (P2)</span>
-              <span className={styles.statIcon}>📦</span>
-            </div>
-            <div className={styles.statValue}>{supplyReqCount}</div>
-            <div className={styles.statSubtext}>Critical Logistics & Medical Needs</div>
-          </div>
-
-          {/* 4. Average Relay Hops */}
-          <div className={`${styles.statCard} ${styles.statHops}`}>
-            <div className={styles.statCardTop}>
-              <span className={styles.statLabel}>Average Relay Hops</span>
-              <span className={styles.statIcon}>🔀</span>
-            </div>
-            <div className={styles.statValue}>{averageRelayHops}</div>
-            <div className={styles.statSubtext}>Store-Carry-Forward Mesh Relays</div>
-          </div>
-        </section>
-
-        {/* ── Feed Controls & Filter Bar ── */}
-        <section className={styles.controlsSection}>
-          {/* Priority Filter Pills */}
-          <div className={styles.filterPillsGroup}>
-            <button
-              type="button"
-              className={`${styles.filterPill} ${
-                selectedFilter === 'ALL' ? styles.filterPillActive : ''
-              }`}
-              onClick={() => setSelectedFilter('ALL')}
-            >
-              All Transmissions
-              <span className={styles.filterCount}>{totalIncidents}</span>
-            </button>
-
-            <button
-              type="button"
-              className={`${styles.filterPill} ${
-                selectedFilter === Priority.EMERGENCY_AUTHORITY ? styles.filterPillActive : ''
-              }`}
-              onClick={() => setSelectedFilter(Priority.EMERGENCY_AUTHORITY)}
-            >
-              P0 Authority
-              <span className={styles.filterCount}>{p0AuthorityCount}</span>
-            </button>
-
-            <button
-              type="button"
-              className={`${styles.filterPill} ${
-                selectedFilter === Priority.CIVILIAN_SOS ? styles.filterPillActive : ''
-              }`}
-              onClick={() => setSelectedFilter(Priority.CIVILIAN_SOS)}
-            >
-              P1 Critical SOS
-              <span className={styles.filterCount}>{activeSosCount}</span>
-            </button>
-
-            <button
-              type="button"
-              className={`${styles.filterPill} ${
-                selectedFilter === Priority.RESOURCE_LOGISTICS ? styles.filterPillActive : ''
-              }`}
-              onClick={() => setSelectedFilter(Priority.RESOURCE_LOGISTICS)}
-            >
-              P2 Supplies
-              <span className={styles.filterCount}>{supplyReqCount}</span>
-            </button>
-
-            <button
-              type="button"
-              className={`${styles.filterPill} ${
-                selectedFilter === Priority.GENERAL_INFO ? styles.filterPillActive : ''
-              }`}
-              onClick={() => setSelectedFilter(Priority.GENERAL_INFO)}
-            >
-              P3 Info
-              <span className={styles.filterCount}>{p3InfoCount}</span>
-            </button>
-          </div>
-
-          {/* Search & Sort Controls */}
-          <div className={styles.searchAndSort}>
-            {/* Search Box */}
-            <div className={styles.searchBox}>
-              <span className={styles.searchIcon}>🔍</span>
-              <input
-                type="text"
-                placeholder="Search ID, payload, GPS..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className={styles.searchInput}
-              />
-            </div>
-
-            {/* Sort Dropdown */}
-            <select
-              value={sortMode}
-              onChange={(e) =>
-                setSortMode(e.target.value as 'PRIORITY_CHRONO' | 'PURE_CHRONO')
-              }
-              className={styles.sortSelect}
-              title="Ordering mode"
-            >
-              <option value="PRIORITY_CHRONO">Prioritized (P0 → P3)</option>
-              <option value="PURE_CHRONO">Chronological (Newest First)</option>
-            </select>
-
-            {/* Map View Mode Toggle */}
-            <div className={styles.viewToggleGroup}>
-              <button
-                type="button"
-                className={`${styles.viewToggleBtn} ${
-                  viewMode === 'SPLIT' ? styles.viewToggleBtnActive : ''
-                }`}
-                onClick={() => setViewMode('SPLIT')}
-                title="Split View (Incident Feed + Tactical Map)"
-              >
-                <span>◫</span> Split
-              </button>
-              <button
-                type="button"
-                className={`${styles.viewToggleBtn} ${
-                  viewMode === 'FEED_ONLY' ? styles.viewToggleBtnActive : ''
-                }`}
-                onClick={() => setViewMode('FEED_ONLY')}
-                title="Incident Feed Only"
-              >
-                <span>☰</span> Feed
-              </button>
-              <button
-                type="button"
-                className={`${styles.viewToggleBtn} ${
-                  viewMode === 'MAP_ONLY' ? styles.viewToggleBtnActive : ''
-                }`}
-                onClick={() => setViewMode('MAP_ONLY')}
-                title="Tactical Map Only"
-              >
-                <span>🗺️</span> Map
-              </button>
-            </div>
-          </div>
-        </section>
-
-        {/* ── Tactical Layout (Map & Incident Feed) ── */}
-        <div
-          className={`${styles.tacticalLayout} ${
-            viewMode === 'SPLIT' ? styles.tacticalLayoutSplit : ''
-          }`}
-        >
-          {/* Tactical Map Column (visible in SPLIT or MAP_ONLY) */}
-          {viewMode !== 'FEED_ONLY' && (
-            <div
-              className={`${styles.mapColumn} ${
-                viewMode === 'SPLIT' ? styles.mapColumnSticky : ''
-              }`}
-            >
-              <TacticalMap
-                incidents={displayedIncidents}
-                selectedIncidentId={selectedIncidentId}
-                onSelectIncident={(inc) => {
-                  setSelectedIncidentId(inc.messageId);
-                }}
-                className={
-                  viewMode === 'MAP_ONLY'
-                    ? styles.mapContainerFull
-                    : styles.mapContainerSplit
-                }
-                viewTrigger={viewMode}
-              />
-            </div>
-          )}
-
-          {/* Incident Feed Column (visible in SPLIT or FEED_ONLY) */}
-          {viewMode !== 'MAP_ONLY' && (
-            <div className={styles.feedColumn}>
-              {/* ── Live Incident Feed ── */}
-              <section className={styles.feedSection}>
-                <div className={styles.feedHeader}>
-                  <div className={styles.feedTitleGroup}>
-                    <h2 className={styles.feedTitle}>Live Incident Feed</h2>
-                    <div className={styles.liveBeacon}>
-                      <span className={styles.liveBeaconDot} />
-                      REAL-TIME STREAM
-                    </div>
-                  </div>
-                  <span className={styles.feedCountBadge}>
-                    Showing {displayedIncidents.length} of {totalIncidents} Transmissions
+              <div className={styles.feedHeaderRight}>
+                <button
+                  type="button"
+                  className={`${styles.sortModeBtn} font-mono`}
+                  onClick={() =>
+                    setSortMode((prev) =>
+                      prev === 'PRIORITY_CHRONO' ? 'PURE_CHRONO' : 'PRIORITY_CHRONO'
+                    )
+                  }
+                  title="Toggle Sorting Mode"
+                >
+                  <ArrowUpDown size={11} />
+                  <span>
+                    {sortMode === 'PRIORITY_CHRONO' ? 'SORT: PRIORITY + TIME' : 'SORT: CHRONO ONLY'}
                   </span>
-                </div>
+                </button>
+              </div>
+            </div>
 
+            <div className={styles.feedScrollArea}>
+              <AnimatePresence initial={false}>
                 {displayedIncidents.length === 0 ? (
-                  <div className={styles.emptyFeed}>
-                    <div className={styles.emptyRadarAnim} />
-                    <div className={styles.emptyTitle}>No Emergency Transmissions in Queue</div>
-                    <p className={styles.emptyDesc}>
-                      Listening on opportunistic BLE gateway synchronization channel. Transmissions
-                      relayed via store-carry-forward nodes will stream here automatically.
+                  <div className={styles.emptyFeedState}>
+                    <AlertCircle size={32} className={styles.emptyIcon} />
+                    <p className={`${styles.emptyText} font-mono`}>
+                      NO MATCHING INCIDENTS TRANSMITTED IN CURRENT FILTER
                     </p>
-                    <button
-                      type="button"
-                      className={`${styles.btnIcon} ${styles.btnSimulate}`}
-                      onClick={() => simulateInboundIncident()}
-                    >
-                      Simulate Inbound Transmission
-                    </button>
                   </div>
                 ) : (
-                  <div className={styles.incidentList}>
-                    {displayedIncidents.map((incident) => {
-                      const payloadObj = parsePayload(incident.payload);
-                      const details = extractDetails(payloadObj);
-                      const category = extractCategory(payloadObj, incident.priority);
-                      const headcount = extractHeadcount(payloadObj);
-                      const isExpanded = expandedPayloadIds.has(incident.messageId);
-                      const isCopied = copiedId === incident.messageId;
-
-                      // Priority card border style
-                      const priorityClass =
-                        incident.priority === Priority.EMERGENCY_AUTHORITY
-                          ? styles.cardPriorityP0
-                          : incident.priority === Priority.CIVILIAN_SOS
-                            ? styles.cardPriorityP1
-                            : incident.priority === Priority.RESOURCE_LOGISTICS
-                              ? styles.cardPriorityP2
-                              : styles.cardPriorityP3;
-
-                      return (
-                        <article
-                          key={incident.messageId}
-                          className={`${styles.incidentCard} ${priorityClass}`}
-                        >
-                          {/* Top Row: Triage Tag + Security Badge + Timestamps */}
-                          <div className={styles.cardHeaderRow}>
-                            <div className={styles.cardHeaderBadges}>
-                              {/* Triage Tag */}
-                              {incident.priority === Priority.EMERGENCY_AUTHORITY && (
-                                <span className={styles.triageP0}>
-                                  ⚠️ P0 AUTHORITY ALERT
-                                </span>
-                              )}
-                              {incident.priority === Priority.CIVILIAN_SOS && (
-                                <span className={styles.triageP1}>
-                                  🚨 P1 CRITICAL SOS
-                                </span>
-                              )}
-                              {incident.priority === Priority.RESOURCE_LOGISTICS && (
-                                <span className={styles.triageP2}>
-                                  📦 P2 SUPPLIES REQUEST
-                                </span>
-                              )}
-                              {incident.priority === Priority.GENERAL_INFO && (
-                                <span className={styles.triageP3}>
-                                  ℹ️ P3 GENERAL INFO
-                                </span>
-                              )}
-
-                              {/* Cryptographic Security Badge */}
-                              <span
-                                className={styles.securityBadge}
-                                title="Decoded from Ed25519 digitally signed wire frame. Cryptographic authenticity validated by gateway."
-                              >
-                                <span className={styles.securityBadgeIcon}>🛡️</span>
-                                Ed25519 Cryptographically Verified
-                              </span>
-                            </div>
-
-                            {/* Timestamp */}
-                            <div className={styles.timestampGroup}>
-                              <span className={styles.timeRelative}>
-                                {formatRelativeTime(incident.timestamp)}
-                              </span>
-                              <span>•</span>
-                              <span className={styles.timeUtc}>
-                                {formatUtcTime(incident.timestamp)}
-                              </span>
-                            </div>
-                          </div>
-
-                          {/* Card Body: Category, Headcount, Situational Details */}
-                          <div className={styles.cardBody}>
-                            <div className={styles.payloadHeaderRow}>
-                              <span className={styles.categoryTag}>{category}</span>
-
-                              {headcount !== null && (
-                                <span className={styles.headcountBadge}>
-                                  <span>👥</span>
-                                  <span>Headcount:</span>
-                                  <span className={styles.headcountValue}>{headcount}</span>
-                                  <span>Victim{headcount > 1 ? 's' : ''} at Risk</span>
-                                </span>
-                              )}
-                            </div>
-
-                            <p className={styles.situationalNotes}>{details}</p>
-                          </div>
-
-                          {/* Packet Telemetry Data Grid */}
-                          <div className={styles.telemetryGrid}>
-                            {/* Message ID Slice */}
-                            <div className={styles.telemetryItem}>
-                              <span className={styles.telemetryKey}>Message ID</span>
-                              <span className={styles.telemetryValue}>
-                                #{incident.messageId.slice(0, 8)}...
-                                <button
-                                  type="button"
-                                  className={styles.copyBtn}
-                                  onClick={() => copyMessageId(incident.messageId)}
-                                  title="Copy full message ID"
-                                >
-                                  {isCopied ? '✓ Copied' : '📋'}
-                                </button>
-                              </span>
-                            </div>
-
-                            {/* Hop Count */}
-                            <div className={styles.telemetryItem}>
-                              <span className={styles.telemetryKey}>Relay Hops</span>
-                              <span className={styles.telemetryValue}>
-                                🔀 {incident.hopCount} {incident.hopCount === 1 ? 'Hop' : 'Hops'}
-                              </span>
-                            </div>
-
-                            {/* Epoch Timestamp */}
-                            <div className={styles.telemetryItem}>
-                              <span className={styles.telemetryKey}>Epoch Timestamp</span>
-                              <span className={styles.telemetryValue}>
-                                ⏱️ {formatEpoch(incident.timestamp)}
-                              </span>
-                            </div>
-
-                            {/* Lat / Lng Coordinates */}
-                            <div className={styles.telemetryItem}>
-                              <span className={styles.telemetryKey}>GPS Coordinates</span>
-                              <span className={styles.telemetryValue}>
-                                {incident.lat !== null && incident.lng !== null ? (
-                                  <a
-                                    href={`https://www.openstreetmap.org/?mlat=${incident.lat}&mlon=${incident.lng}#map=16/${incident.lat}/${incident.lng}`}
-                                    target="_blank"
-                                    rel="noreferrer"
-                                    className={styles.coordLink}
-                                    title="View GPS fix on OpenStreetMap"
-                                  >
-                                    📍 {Number(incident.lat).toFixed(4)}°, {Number(incident.lng).toFixed(4)}° ↗
-                                  </a>
-                                ) : (
-                                  <span style={{ color: '#64748b' }}>📍 GPS Offline</span>
-                                )}
-                              </span>
-                            </div>
-                          </div>
-
-                          {/* Expandable Raw Payload Inspector */}
-                          <button
-                            type="button"
-                            className={styles.rawDetailsToggle}
-                            onClick={() => togglePayloadExpand(incident.messageId)}
-                          >
-                            {isExpanded ? '▲ Hide Raw Wire Data' : '▼ Inspect Wire Payload JSON'}
-                          </button>
-
-                          {isExpanded && (
-                            <pre className={styles.rawPayloadBox}>
-                              {JSON.stringify(
-                                {
-                                  messageId: incident.messageId,
-                                  priority: incident.priority,
-                                  hopCount: incident.hopCount,
-                                  timestamp: incident.timestamp,
-                                  lat: incident.lat,
-                                  lng: incident.lng,
-                                  receivedAt: incident.receivedAt,
-                                  payload: payloadObj,
-                                  signatureVerified: true,
-                                  cryptoAlgorithm: 'Ed25519-SHA512',
-                                },
-                                null,
-                                2,
-                              )}
-                            </pre>
-                          )}
-                        </article>
-                      );
-                    })}
-                  </div>
+                  displayedIncidents.map((incident) => (
+                    <IncidentCard
+                      key={incident.messageId}
+                      incident={incident}
+                      isSelected={incident.messageId === selectedIncidentId}
+                      onSelect={(inc) => setSelectedIncidentId(inc.messageId)}
+                      onFocusMap={handleFocusMap}
+                    />
+                  ))
                 )}
-              </section>
+              </AnimatePresence>
             </div>
-          )}
-        </div>
+          </section>
+        )}
+
+        {/* Right Pane: Sticky Tactical GIS Radar Map */}
+        {viewMode !== 'FEED_ONLY' && (
+          <section className={styles.mapPane}>
+            <TacticalMap
+              incidents={displayedIncidents}
+              selectedIncidentId={selectedIncidentId}
+              onSelectIncident={(inc) => setSelectedIncidentId(inc.messageId)}
+              viewTrigger={viewMode}
+            />
+          </section>
+        )}
       </main>
+
+      {/* ── Interactive Packet Simulator Slide-Over Drawer ── */}
+      <PacketSimulatorModal
+        isOpen={isSimulatorOpen}
+        onClose={() => setIsSimulatorOpen(false)}
+        onInjectIncident={handleInjectSimulatedIncident}
+      />
+
+      {/* ── Mobile & Rugged Field Tablet Bottom Navigation Dock (< 1024px) ── */}
+      <nav className={styles.mobileNavDock}>
+        <button
+          type="button"
+          className={`${styles.mobileDockBtn} ${mobileTab === 'FEED' ? styles.active : ''}`}
+          onClick={() => {
+            setMobileTab('FEED');
+            setViewMode('FEED_ONLY');
+          }}
+        >
+          <List size={16} />
+          <span>TRANSMISSIONS</span>
+        </button>
+
+        <button
+          type="button"
+          className={`${styles.mobileDockBtn} ${mobileTab === 'MAP' ? styles.active : ''}`}
+          onClick={() => {
+            setMobileTab('MAP');
+            setViewMode('MAP_ONLY');
+          }}
+        >
+          <MapIcon size={16} />
+          <span>GIS RADAR</span>
+        </button>
+
+        <button
+          type="button"
+          className={`${styles.mobileDockBtn} ${mobileTab === 'METRICS' ? styles.active : ''}`}
+          onClick={() => {
+            setMobileTab('METRICS');
+            setViewMode('SPLIT');
+          }}
+        >
+          <BarChart3 size={16} />
+          <span>C2 SPLIT</span>
+        </button>
+      </nav>
     </div>
   );
 }
