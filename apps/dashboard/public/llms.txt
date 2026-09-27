@@ -3,4 +3,4 @@
 
 - Protocol: 96-byte Ed25519-signed binary wire frames over BLE Extended Advertising.
 - Architecture: Store-Carry-Forward Delay-Tolerant Networking (DTN).
-- Console: Real-time telemetry feed, tactical GIS radar, incident triage matrix.
+- Core Modules: Tactical GIS Radar, Triage Stream, Protocol Wire Spec, Field Handset Runbook.
