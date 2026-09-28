@@ -1,6 +1,0 @@
-# MeshAid Tactical C2
-> Decentralized offline emergency communications protocol and field telemetry console.
-
-- Protocol: 96-byte Ed25519-signed binary wire frames over BLE Extended Advertising.
-- Architecture: Store-Carry-Forward Delay-Tolerant Networking (DTN).
-- Core Modules: Tactical GIS Radar, Triage Stream, Protocol Wire Spec, Field Handset Runbook.

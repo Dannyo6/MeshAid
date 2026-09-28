@@ -40,67 +40,32 @@ jobs:
           done
           echo "All required documentation files verified successfully."
 
-  protocol-tests:
-    name: Protocol Engine & Relay Tests
+  android-ci:
+    name: Android Build & Unit Tests
     runs-on: ubuntu-latest
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
 
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
         with:
-          node-version: 22
-          cache: 'npm'
-          cache-dependency-path: package-lock.json
+          distribution: 'temurin'
+          java-version: '17'
+          cache: 'gradle'
 
-      - name: Install dependencies
-        run: npm ci
+      - name: Grant execute permission for gradlew
+        run: chmod +x gradlew
 
-      - name: Build Protocol Core
-        working-directory: packages/protocol
-        run: npm run build
+      - name: Run Android Unit Tests
+        run: ./gradlew testDebugUnitTest
 
-      - name: Static Type Lint
-        working-directory: packages/protocol
-        run: npm run lint
+      - name: Assemble Debug APK
+        run: ./gradlew assembleDebug
 
-      - name: Execute Protocol Unit & 3-Node Relay Tests
-        working-directory: packages/protocol
-        run: npm test
-
-  service-build-checks:
-    name: Service Build Checks (${{ matrix.target.name }})
-    runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        target:
-          - name: Backend Gateway Service
-            path: services/backend
-          - name: Incident Dashboard App
-            path: apps/dashboard
-    steps:
-      - name: Check out repository
-        uses: actions/checkout@v4
-
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
+      - name: Upload Debug APK
+        uses: actions/upload-artifact@v4
         with:
-          node-version: 22
-          cache: 'npm'
-          cache-dependency-path: package-lock.json
-
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Build Protocol Core Dependency
-        working-directory: packages/protocol
-        run: npm run build
-
-      - name: Static Type Lint
-        working-directory: ${{ matrix.target.path }}
-        run: npm run lint
-
-      - name: Build ${{ matrix.target.name }}
-        working-directory: ${{ matrix.target.path }}
-        run: npm run build
+          name: app-debug
+          path: app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error

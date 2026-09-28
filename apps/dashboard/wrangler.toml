@@ -1,8 +1,0 @@
-#:schema node_modules/wrangler/config-schema.json
-name = "meshaid-ops"
-compatibility_date = "2024-09-01"
-pages_build_output_dir = "dist"
-
-[vars]
-ENVIRONMENT = "production"
-APP_NAME = "MeshAid Tactical Incident C2"
