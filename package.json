@@ -11,6 +11,8 @@
   "scripts": {
     "test": "npm run test --workspaces --if-present",
     "build": "npm run build --workspaces --if-present",
+    "build:dashboard": "npm run build --workspace=@meshaid/dashboard",
+    "deploy:dashboard": "npm run deploy --workspace=@meshaid/dashboard",
     "lint": "npm run lint --workspaces --if-present"
   },
   "keywords": [

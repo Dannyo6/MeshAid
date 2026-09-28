@@ -1,172 +1,227 @@
 # MeshAid
 
-**Zero-Infrastructure Decentralized Emergency Mesh Network & Tactical C2 Telemetry System**
+**Zero-Infrastructure Opportunistic Delay-Tolerant Mesh Network & Tactical Emergency Incident Command System**
 
+[![Deployment: Cloudflare Pages](https://img.shields.io/badge/Deployment-Cloudflare%20Pages-F38020?logo=cloudflarepages&logoColor=white)](https://meshaid-ops.pages.dev)
+[![Kotlin: 2.0+](https://img.shields.io/badge/Kotlin-2.0%2B-7F52FF?logo=kotlin&logoColor=white)](#)
+[![Android: 12+ (API 31+)](https://img.shields.io/badge/Android-12%2B%20(API%2031%2B)-3DDC84?logo=android&logoColor=white)](#)
+[![Radio: BLE 5.0 Extended Adv](https://img.shields.io/badge/Radio-BLE%205.0%20Extended%20Adv%20(251B)-0082FC?logo=bluetooth&logoColor=white)](#standardized-cryptographic-wire-protocol-specification)
+[![Security: Ed25519 Signatures](https://img.shields.io/badge/Security-Ed25519%20Signed-red)](#cryptographic-wire-specification)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
-[![Engine: TypeScript / Kotlin](https://img.shields.io/badge/Stack-TypeScript%20%7C%20Kotlin%20%7C%20React-orange.svg)](#)
-[![Protocol: 96--Byte Binary Wire](https://img.shields.io/badge/Protocol-96--Byte%20Binary%20Wire%20v1-success.svg)](#standardized-96-byte-wire-protocol-specification)
-[![Security: Ed25519 Signed](https://img.shields.io/badge/Security-Ed25519%20Signed-red.svg)](#)
-[![Architecture: Strictly Non-AI](https://img.shields.io/badge/Architecture-Strictly%20Deterministic%20(Non--AI)-lightgrey.svg)](#)
+[![Architecture: Strictly Deterministic](https://img.shields.io/badge/Architecture-Strictly%20Deterministic%20(Non--AI)-333333)](#)
 
 ---
 
-## 1. Executive Summary
+## 1. Concrete Problem Statement: Infrastructure Collapse in Crisis Scenarios
 
-**MeshAid** is a resilient, delay-tolerant emergency communications network engineered for rapid deployment during complete telecommunication infrastructure failure (earthquakes, severe hurricanes, power grid blackouts, or remote search-and-rescue operations).
-
-Operating under an intentional, strictly deterministic non-AI mandate, MeshAid enables peer-to-peer **Delay-Tolerant Networking (DTN)** using **Store-Carry-Forward** routing over native **Bluetooth Low Energy (BLE)** on commercial off-the-shelf (COTS) Android devices.
-
-### Core Value Proposition
-- **Zero External Hardware:** Runs entirely on standard consumer smartphones without requiring specialized Software Defined Radios (SDRs), LoRa hardware dongles, satellite transceivers, or cellular backbones.
-- **Physical Data Mules:** When network partitions divide disaster zones, mobile nodes physically carry cryptographically signed telemetry and opportunistically discharge packets when coming within radio range of other nodes or internet-connected edge sinks.
-- **Cryptographic Trust:** Every emergency frame is immutably signed at source via asymmetric Ed25519 keypairs, binding the geographic coordinates, priority, and payload against in-transit tampering and replay attacks.
-- **End-to-End Incident Command:** Automatically uplinks ingested field telemetry to an incident command base station and presents real-time triage feeds on a tactical Command & Control (C2) console.
-
----
-
-## 2. System Architecture
-
-The following diagram maps the complete end-to-end data lifecycle across physical disaster partitions—from an offline victim to an emergency command operations center:
+During catastrophic natural disasters (catastrophic earthquakes, Category 5 cyclones, tsunami inundation, and regional grid collapse) or wartime disruptions, centralized telecommunications infrastructures experience immediate, systemic failure:
 
 ```
++-----------------------------------------------------------------------------------------------+
+|                             CASCADE INFRASTRUCTURE FAILURE TIMELINE                           |
+|                                                                                               |
+|  [ T = 0h: Disaster Impact ]                                                                  |
+|    └─ High-voltage power transmission lines trip; utility substation grid blackouts occur.    |
+|                                                                                               |
+|  [ T + 2h..12h: Cell Tower Blackout ]                                                         |
+|    └─ Cellular Base Transceiver Stations (BTS) deplete backup Lead-Acid / LiFePO4 batteries.  |
+|    └─ Diesel generators fail due to submerged fuel tanks or blocked municipal supply routes.  |
+|                                                                                               |
+|  [ T + 12h..24h: Physical Backhaul & Backbone Shear ]                                         |
+|    └─ Terrestrial fiber conduits severed by ground displacement, landslides, or flooding.    |
+|                                                                                               |
+|  [ T + 24h+: Core DNS & Routing Table Annihilation ]                                          |
+|    └─ ISP authoritative nameservers, captive portals, and gateway routing fail.              |
+|    └─ Standard mobile applications (WhatsApp, Telegram, Emergency SMS) fail instantaneously. |
+|    └─ THE COMMUNICATION VOID: Civilians & field responders are within acoustic proximity      |
+|       (50m - 1000m) but rendered 100% digitally invisible and unable to coordinate relief.   |
++-----------------------------------------------------------------------------------------------+
+```
+
+### Why Existing Emergency Alternatives Fall Short
+1. **Satellite Terminals (Starlink, Iridium, Garmin inReach):** Prohibitively expensive, bulky, require unobstructed line-of-sight to the sky, and are virtually non-existent in the pockets of trapped civilians.
+2. **Dedicated Sub-GHz LoRa Radios (Meshtastic, APRS):** Require specialized external microcontrollers (ESP32/nRF52) and Semtech SX1262 transceivers. Civilians cannot procure hardware dongles when an unanticipated disaster strikes.
+3. **Traditional Ad-Hoc / Wi-Fi Mesh Networks:** High power consumption drains smartphone batteries within hours; aggressive radio association handshakes fail under dense RF mobility.
+
+### The MeshAid Solution
+MeshAid democratizes disaster communications by transforming commercial off-the-shelf (**COTS**) Android smartphones into autonomous, delay-tolerant mesh nodes. Operating over uncoordinated **Bluetooth Low Energy (BLE) 5.0 Extended Advertisements**, MeshAid operates with **zero cellular connectivity, zero internet access, zero SIM card dependencies, and zero specialized hardware**.
+
+---
+
+## 2. End-to-End Network Topology
+
+MeshAid employs **Delay-Tolerant Networking (DTN)** powered by **Store-Carry-Forward** routing. When network partitions prevent real-time routing, mobile humans (civilians, search-and-rescue teams, medical volunteers) serve as physical "data mules," buffering cryptographically secured telemetry and bridging partitioned geographical clusters.
+
+### Mermaid Architectural Topology
+```mermaid
+graph TD
+    subgraph DisasterImpactZone ["DISASTER IMPACT ZONE (Total Infrastructure Blackout)"]
+        Victim["Node A: Trapped Civilian<br/>(P1 SOS Distress Beacon)<br/>• Ed25519 Source-Signed Frame<br/>• WGS84 GPS Coordinates<br/>• BLE 5.0 Extended Adv (251B)"]
+        Relay1["Node B: Mobile Volunteer / Mule<br/>(Physical Mobility across Zone)<br/>• Passive Background BLE Scanner<br/>• Signature Verification & Deduplication<br/>• Room SQLite Priority Queue (P0-P3)<br/>• Increments Hop Counter (TTL <= 7)"]
+        Relay2["Node C: Evacuation Convoy Mule<br/>(Store-Carry-Forward Carrier)<br/>• Re-broadcasts via Secondary Adv PHY<br/>• Traverses 500m Partition Boundary"]
+        Victim -->|10-40m BLE RF Encounter| Relay1
+        Relay1 -->|Physical Human Transit| Relay2
+    end
+
+    subgraph EdgeZone ["EDGE BOUNDARY (Restored Connectivity)"]
+        Gateway["Node D: Incident Field Gateway<br/>(Emergency Vehicle / Satellite Handset)<br/>• Ingests Buffered Wire Frames over BLE<br/>• NetworkStateCallback Detects LTE/Wi-Fi<br/>• Transactional HTTPS Sync Engine"]
+        Relay2 -->|BLE Radio Encounter| Gateway
+    end
+
+    subgraph CommandStation ["TACTICAL COMMAND BASE STATION & GLOBAL C2"]
+        Backend["Gateway Ingestion Base Station<br/>(services/backend: Node.js / SQLite)<br/>• Validates Magic Bytes & Ed25519 Sigs<br/>• Deduplicates via SHA-256 Message ID<br/>• Emits Low-Latency WebSocket Stream"]
+        Cloudflare["Cloudflare Operations Console<br/>(meshaid-ops.pages.dev)<br/>• Globally Distributed Edge Deployment<br/>• Zero-API-Key Darkened GIS Radar<br/>• Live NATO Triage Stream (P0..P3)<br/>• Raw 96-Byte Hex Frame Inspector"]
+        Gateway -->|HTTPS POST /api/mesh/sync| Backend
+        Backend -->|WSS Real-Time Telemetry| Cloudflare
+    end
+```
+
+### ASCII Physical Encounter Topology
+```
 +----------------------------------------------------------------------------------------------------+
-|                                    DISASTER IMPACT ZONE (OFFLINE)                                   |
+|                                  DISASTER IMPACT ZONE (OFFLINE)                                    |
 |                                                                                                    |
 |  [ Node A: Victim SOS ]                                                                            |
-|  - Generates P1 SOS Telemetry                                                                      |
-|  - Signs frame with Ed25519 Private Key                                                            |
-|  - Encodes 96-Byte Binary Frame + JSON Payload                                                     |
-|  - Broadcasts via BLE 5.0 Extended Adv (or Legacy Chunks)                                          |
+|  - Encodes 96-Byte Binary Header + Incident JSON Payload                                           |
+|  - Signs canonical pre-image via private Ed25519 Key                                               |
+|  - Transmits via BLE 5.0 Extended Advertising (PHY_LE_1M / Non-Connectable)                        |
 |         |                                                                                          |
-|         | (10-40m RF Encounter / No Cellular / No Internet)                                         |
+|         | (10-40m RF Encounter / Zero Infrastructure / No Cellular)                                 |
 |         v                                                                                          |
-|  [ Node B: Mobile Relay / Data Mule ]                                                              |
-|  - Receives frame via BLE Background Scanner                                                       |
-|  - Reassembles multi-chunk payload (100-session LRU Buffer)                                        |
-|  - Cryptographically verifies Ed25519 signature & validates TTL                                    |
-|  - Stores in local Room SQLite (Priority Queue: P0 -> P1 -> P2 -> P3)                              |
-|  - Physically moves across partition boundary (Store-Carry-Forward)                                |
-|  - Increments Hop Count (drop if >= 7) and re-advertises to nearby peers                           |
+|  [ Node B: Mobile Data Mule (Evacuee / Paramedic) ]                                                |
+|  - Ingests wire frame via native Android BluetoothLeScanner                                        |
+|  - Verifies Ed25519 public signature against packet integrity pre-image                            |
+|  - Stores in Room SQLite Priority Queue: P0 (Auth) > P1 (SOS) > P2 (Logistics) > P3 (Info)         |
+|  - Physical transit across physical terrain obstacle (Store-Carry-Forward)                         |
+|  - Increments Hop Count (drops if >= 7) and re-advertises to nearby nodes                          |
 +----------------------------------------------------------------------------------------------------+
                                            |
-                                           | (Physical Mobility across partition)
+                                           | Physical Mobility across partition boundary
                                            v
 +----------------------------------------------------------------------------------------------------+
-|                                      EDGE ZONE (RESTORED UPLINK)                                   |
+|                                    EDGE RESTORATION ZONE                                           |
 |                                                                                                    |
-|  [ Node C: Sink Handset / Internet Gateway ]                                                       |
-|  - Ingests wire frame over BLE encounter with Node B                                               |
-|  - ConnectivityManager detects active Wi-Fi / LTE Uplink                                           |
-|  - Automated Sync flushes buffered wire frames via HTTP POST Base64                                |
+|  [ Node C: Field Gateway Handset / Incident Vehicle ]                                              |
+|  - Ingests buffered frames over BLE encounter with Node B                                          |
+|  - ConnectivityManager detects active satellite/LTE backhaul link                                  |
+|  - Flushes queued frames via transactional HTTP POST Base64 payload                                |
 +----------------------------------------------------------------------------------------------------+
                                            |
-                                           | HTTPS / POST /api/mesh/sync
+                                           | HTTPS POST /api/mesh/sync
                                            v
 +----------------------------------------------------------------------------------------------------+
-|                                 TACTICAL COMMAND BASE STATION (C2)                                 |
+|                               GLOBAL OPERATIONS BASE STATION & C2                                  |
 |                                                                                                    |
-|  [ services/backend: Ingestion & Gateway ]                                                         |
-|  - Decodes 96-byte wire frame from Base64 string                                                   |
-|  - Validates Magic Bytes (0x4D 0x41), Version, and Ed25519 signature                               |
-|  - SHA-256 Message Deduplication via SQLite persistence layer                                      |
-|  - Dispatches WebSocket Event (EVENT_NEW_INCIDENT) to active subscribers                           |
+|  [ services/backend: Ingestion Base Station ]                                                      |
+|  - Decodes binary wire frames; validates Magic Bytes (0x4D 0x41) and Ed25519 signatures            |
+|  - SHA-256 deduplication and SQLite telemetry persistence                                          |
+|  - Dispatches WebSocket events (EVENT_NEW_INCIDENT) to connected C2 clients                        |
 |         |                                                                                          |
-|         | WebSocket (ws://localhost:3000)                                                          |
+|         | WebSocket Event Pipeline                                                                 |
 |         v                                                                                          |
-|  [ apps/dashboard: Tactical Incident Command Console ]                                             |
-|  - High-contrast C2 Terminal with dark-filtered OpenStreetMap GIS Canvas                           |
-|  - Incident Triage Stream with live priority sorting (P1 Distress, P2 Logistics, P3 Info)           |
-|  - Raw 96-Byte Hex Frame Inspector & Automated Headcount / Casualty Aggregation                    |
+|  [ Cloudflare Operations Console: https://meshaid-ops.pages.dev ]                                  |
+|  - Static edge deployment on Cloudflare Pages (meshaid-ops)                                        |
+|  - High-contrast tactical GIS radar with custom dark-filtered OpenStreetMap tiles                  |
+|  - Real-time casualty/triage KPI aggregation and raw byte-level frame inspector                    |
 +----------------------------------------------------------------------------------------------------+
 ```
 
 ---
 
-## 3. Standardized 96-Byte Wire Protocol Specification
+## 3. Standardized Cryptographic Wire Protocol Specification
 
-MeshAid communicates using a fixed-width 96-byte binary header followed by a variable-length UTF-8 JSON payload. All multi-byte numeric fields are encoded in **Big-Endian (Network Byte Order)**.
+MeshAid packets are engineered to fit inside the **251-byte maximum advertising data payload** permitted by the **Bluetooth Core Specification v5.0+ LE Extended Advertising** standard (or degraded into indexed chunks on legacy BLE 4.x hardware).
 
-### Binary Header Layout
+All multi-byte numeric fields are encoded in **Big-Endian (Network Byte Order)**. All floating-point fields strictly conform to the **IEEE 754-2008 single-precision 32-bit format**.
 
-| Byte Offset | Size | Field Name | Data Type | Description |
-| :--- | :--- | :--- | :--- | :--- |
-| `00..01` | 2B | **Magic Bytes** | `0x4D 0x41` | ASCII `"MA"` framing identifier for rapid packet rejection. |
-| `02` | 1B | **Version** | `UInt8` | Protocol version (Fixed to `0x01`). |
-| `03` | 1B | **Priority Tier** | `UInt8` | `0x00` = P0 (Authority), `0x01` = P1 (SOS), `0x02` = P2 (Logistics), `0x03` = P3 (Info). |
-| `04..05` | 2B | **Hop Count** | `UInt16 BE` | Current forward count. Incremented at each hop. Dropped if $\ge 7$. |
-| `06..13` | 8B | **Message ID** | `8 Bytes` | Truncated SHA-256 hash of sender public key, timestamp, and payload. |
-| `14..17` | 4B | **Timestamp** | `UInt32 BE` | Epoch seconds of message creation. |
-| `18..21` | 4B | **TTL** | `UInt32 BE` | Time-to-Live duration in seconds. Expired packets are dropped. |
-| `22..25` | 4B | **Latitude** | `Float32 BE` | WGS84 Latitude encoded as IEEE 754 single-precision float. |
-| `26..29` | 4B | **Longitude** | `Float32 BE` | WGS84 Longitude encoded as IEEE 754 single-precision float. |
-| `30..31` | 2B | **Payload Length** | `UInt16 BE` | Byte length $N$ of the trailing JSON payload. |
-| `32..95` | 64B | **Ed25519 Signature** | `64 Bytes` | Asymmetric cryptographic signature covering bytes `00..31` + payload. |
-| `96..End` | $N$ B | **Variable Payload** | `UTF-8 JSON` | Canonical telemetry payload: `headcount`, `situation`, `supplies`, `sector`. |
+### Complete 251-Byte Wire Frame Budget & Header Layout
 
-### Cryptographic Binding
-- The 64-byte Ed25519 signature is calculated over the canonical pre-image `[Header Bytes 00..31 || Payload Bytes 96..96+N]`.
-- Receivers verify the signature using the sender's public key (derived or transmitted in registration). Tampered coordinates, corrupted hop counts, or modified payloads invalidate the signature, causing instantaneous frame rejection before persistence.
+| Byte Offset | Size | Field Name | Data Type | Encoding / Endianness | Protocol & Cryptographic Function |
+| :--- | :--- | :--- | :--- | :--- | :--- |
+| `00..01` | 2B | **Magic Framing Bytes** | `0x4D 0x41` | Big-Endian (ASCII `"MA"`) | Hardware-level frame sync. Packets without this prefix are discarded in kernel space before parsing. |
+| `02` | 1B | **Protocol Version** | `UInt8` | Binary (`0x01`) | Identifies protocol release version. Incompatible versions are rejected immediately. |
+| `03` | 1B | **Packet Type / Priority** | `UInt8` | Binary Enum (`0x00..0x03`) | `0x00` = P0 (Authority), `0x01` = P1 (Civilian SOS), `0x02` = P2 (Logistics), `0x03` = P3 (General Info). |
+| `04..05` | 2B | **TTL Hop Counter** | `UInt16` | Big-Endian UInt16 | Monotonically incremented at each relay hop. Dropped if $\ge 7$ to eliminate network routing loops. |
+| `06..13` | 8B | **Message ID / Author Slice** | `8 Bytes` | Truncated SHA-256 | Cryptographic fingerprint slice of author public key, timestamp, and payload. Used for deduplication. |
+| `14..17` | 4B | **Epoch Timestamp** | `UInt32` | Big-Endian UInt32 | UTC timestamp in epoch seconds when the packet was authored at the origin node. |
+| `18..21` | 4B | **Time-To-Live (TTL)** | `UInt32` | Big-Endian UInt32 | Validity duration in seconds. Dropped when $\text{Epoch}_{\text{now}} \ge \text{Timestamp} + \text{TTL}$. |
+| `22..25` | 4B | **WGS84 Latitude** | `Float32` | IEEE 754 Big-Endian | Latitude coordinate of victim encounter (`0x7FC00000` / `Float.NaN` if GPS locked unavailable). |
+| `26..29` | 4B | **WGS84 Longitude** | `Float32` | IEEE 754 Big-Endian | Longitude coordinate of victim encounter (`0x7FC00000` / `Float.NaN` if GPS locked unavailable). |
+| `30..31` | 2B | **Payload Length ($N$)** | `UInt16` | Big-Endian UInt16 | Byte length $N$ of trailing incident payload ($0 \le N \le 155$ in single-packet BLE frame; up to 65,535 in multi-chunk sessions). |
+| `32..95` | 64B | **Ed25519 Signature** | `64 Bytes` | Raw Binary Signature | Cryptographic signature generated by the author's private key covering bytes `00..31` concatenated with the payload. |
+| `96..250`| $N$ B | **Incident Payload** | `Binary / JSON` | UTF-8 Encoded String | Compact structured incident telemetry: casualty count, trapped status, urgent medical/water needs, and sector ID. |
 
----
+### Extended Advertising Budget Breakdown
+```
+Total BLE 5.0 Extended Advertising Frame Budget: 251 Bytes
+├── [00..31] Fixed Header Metadata   :  32 Bytes ( 12.7% )
+├── [32..95] Ed25519 Signature       :  64 Bytes ( 25.5% )  <-- Fixed Header Total: 96 Bytes (38.2%)
+└── [96..250] Single-Frame Payload   : 155 Bytes ( 61.8% )  <-- Telemetry Budget
+```
 
-## 4. Engineering Highlights & Hardening Implementation
+### Cryptographic Signable Pre-Image Formula
+To guarantee immutable integrity across untrusted relay nodes, the signature pre-image binds the framing, priority, origin, hops, timestamp, coordinates, and payload:
 
-### Dual-Mode BLE Radio Architecture
-- **BLE 5.0 Extended Advertising:** Transmits un-fragmented wire frames up to 254 bytes per advertising event on supported chipsets via secondary advertising physical channels (`PHY_LE_1M` / `PHY_LE_CODED`).
-- **Legacy 24-Byte Chunking Fallback:** Automatically degrades to legacy BLE 4.x primary channels (37, 38, 39) with custom 4-byte chunk headers:
-  `[SessionID: 2B] [ChunkIdx: 1B] [TotalChunks: 1B] [Data: <=20B]`.
+$$\text{PreImage} = \text{Header}[00..31] \mathbin{\Vert} \text{Payload}[0..N-1]$$
 
-### Reassembly Buffer Hardening (DoS Mitigation)
-- **100-Session LRU Cache:** Limits active concurrent reassembly sessions to 100 to prevent heap exhaustion.
-- **Sliding 30-Second TTL:** Discards incomplete fragment chains when the time delta between consecutive chunks exceeds 30 seconds.
-- **Strict Boundary Checks:** Drops malformed chunks where chunk index $i \ge n$ or total chunk count $n \notin [1, 16]$.
+The signature $\sigma$ is verified using the author's Ed25519 public key $K_{\text{pub}}$:
 
-### Room SQLite Persistence & Priority Eviction
-- **Deterministic Queue Ordering:** Packets are indexed and queried strictly via `ORDER BY priority ASC, createdAt DESC`.
-- **Active Memory-Pressure Eviction:** Under device storage pressure or maximum packet quotas (10,000 records), low-priority records (`P3_GENERAL_INFO` and `P2_LOGISTICS`) are automatically purged while preserving `P1_CIVILIAN_SOS` and `P0_AUTHORITY`.
+$$\text{Verify}(K_{\text{pub}}, \text{PreImage}, \sigma) \equiv \text{True}$$
 
-### Automated Uplink Synchronization
-- **Network State Observer:** An Android `ConnectivityManager.NetworkCallback` monitors cellular and Wi-Fi interface transitions.
-- **Transactional Base64 Synchronization:** On network acquisition, unsynchronized packets are retrieved from SQLite, encoded into Base64 wire frames, and POSTed to `/api/mesh/sync`. Upon HTTP `200 OK`, local records are marked synchronized.
-
-### OEM Background Hardening
-- **Native Android Foreground Service:** Runs `FOREGROUND_SERVICE_TYPE_CONNECTED_DEVICE` with a persistent low-priority system notification to prevent Android LMK (Low Memory Killer) termination.
-- **Partial CPU Wake Locks:** Acquires a `PowerManager.PARTIAL_WAKE_LOCK` during active scan and broadcast bursts.
-- **Doze & Battery Optimization Bypass:** Invokes `Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS` to ensure radio polling continues while the device is stationary with screen off.
-
-### Tactical Command Dashboard (C2)
-- **Zero API-Key GIS Engine:** Built with Leaflet using free OpenStreetMap raster tiles darkened via custom high-contrast CSS filters (`invert`, `contrast`, `hue-rotate`), eliminating cloud map vendor dependencies.
-- **Real-Time WebSocket Stream:** Instantly renders incoming distress signals with pulsating tactical beacons and NATO priority markers (`[P1:SOS]`, `[P2:SUP]`, `[P3:INF]`).
-- **Raw Hex Inspector:** Allows incident commanders to audit raw 96-byte packet memory frames directly from the interface.
+Any unauthorized alteration of geographic coordinates, TTL hop limits, priority tiers, or incident payload by intermediary nodes immediately invalidates the signature, triggering instantaneous dropped packet rejection.
 
 ---
 
-## 5. Monorepo Structure
+## 4. Technology Stack Breakdown
+
+### Android Mobile Client (`apps/mobile`)
+- **Language & Runtime:** Kotlin 2.0+ targeting Java 17 and Android 12+ (API Level 31 to 34).
+- **Asynchronous Concurrency:** Kotlin Coroutines (`Dispatchers.IO`) & `StateFlow` for non-blocking RF advertisement processing.
+- **User Interface:** Jetpack Compose with Material 3. Engineered with an ultra-high-contrast tactical dark theme to conserve battery on AMOLED displays during power outages.
+- **Local Persistence & Priority Eviction:** Room SQLite database. Implements deterministic retrieval queues (`ORDER BY priority ASC, createdAt DESC`) and automatic LRU eviction under storage quotas (dropping P3/P2 records to protect P1 Civilian SOS).
+- **Cryptographic Security:** Android Security & Java Cryptography Architecture (JCA) with native Ed25519 key generation and signature verification.
+- **Bluetooth Low Energy Engine:**
+  - `BluetoothLeAdvertiser`: Configured for BLE 5.0 Extended Advertising (`AdvertisingSetParameters` with `PHY_LE_1M` / `PHY_LE_CODED`, non-connectable, up to 251-byte advertising PDU) with automatic fallback to 24-byte chunking on legacy BLE 4.x chipsets.
+  - `BluetoothLeScanner`: High-duty cycle scanning in the foreground, transitioning to power-optimized interval scanning in the background.
+- **OEM Background Hardening:** Persistent Foreground Service (`FOREGROUND_SERVICE_TYPE_CONNECTED_DEVICE`), partial CPU `WakeLock` during active scanning bursts, and automated battery optimization exemption requests to survive aggressive OEM task killers (OneUI, MIUI).
+
+### Tactical Incident Command Dashboard (`apps/dashboard`)
+- **Framework & Build:** React 18 with TypeScript 5.7 and Vite 5.
+- **Edge Deployment:** **Cloudflare Pages** (`meshaid-ops.pages.dev`) with sub-50ms global Time-To-First-Byte (TTFB).
+- **Tactical GIS Radar:** Leaflet with dark-filtered OpenStreetMap raster tiles (using custom CSS filters: `invert(100%) hue-rotate(180deg) contrast(120%)`), eliminating any dependency on third-party cloud mapping APIs.
+- **Operational C2 Stream:** Real-time WebSocket connection to ingestion base station, live casualty aggregation, NATO priority triage badges (`[P0:CRIT]`, `[P1:SOS]`, `[P2:LOG]`, `[P3:INF]`), and a raw 96-byte hex frame inspector.
+
+### Ingestion Gateway Base Station (`services/backend`)
+- **Runtime:** Node.js 20 LTS + TypeScript.
+- **Endpoints:** REST API (`POST /api/mesh/sync`) for opportunistic field uploads and WebSocket server for real-time dispatch to C2 consoles.
+- **Storage:** SQLite engine with automated SHA-256 deduplication and transaction-safe telemetry logging.
+
+---
+
+## 5. Repository Monorepo Structure
 
 ```
-meshaid/
-├── packages/
-│   └── protocol/              # TypeScript 96-byte wire codec, Ed25519 signing, DTN simulation tests
-│       ├── src/               # Codec implementation, priority types, bitwise helpers
-│       ├── test/              # 3-node store-carry-forward test suite & boundary checks
-│       └── package.json
-│
+MeshAid/
 ├── apps/
-│   ├── mobile/                # Native Android (Kotlin) DTN Mesh Node Application
-│   │   ├── app/src/main/java/ # BleService, Room Database, ChunkReassembler, UplinkWorker
-│   │   └── build.gradle.kts
+│   ├── dashboard/             # Tactical Incident Command C2 Interface (React + Vite + TS)
+│   │   ├── public/            # Static assets, _redirects, _headers for Cloudflare Pages
+│   │   ├── src/components/    # TacticalMap, IncidentCard, TriageKpiRow, HexDumpInspector
+│   │   ├── wrangler.toml      # Cloudflare Pages deployment configuration (meshaid-ops)
+│   │   └── package.json       # Build and deployment scripts (wrangler pages deploy)
 │   │
-│   └── dashboard/             # Tactical Incident Command C2 Interface (React + Vite + TS)
-│       ├── src/components/    # TacticalMap, IncidentCard, TriageKpiRow, TopHud, reactbits/
-│       ├── Dockerfile         # Multi-stage Nginx production container
-│       └── nginx.conf         # Reverse proxy routing /api and /ws to backend:3000
+│   └── mobile/                # Native Android (Kotlin) DTN Mesh Node Application
+│       ├── app/src/main/      # BleService, Room Database, ChunkReassembler, UplinkWorker
+│       └── build.gradle.kts   # Android 12+ SDK 34, Jetpack Compose, Room persistence
+│
+├── packages/
+│   └── protocol/              # TypeScript 96-byte wire codec, Ed25519 signing & verification
+│       ├── src/               # Codec implementation, priority types, bitwise helpers
+│       └── test/              # 3-node store-carry-forward test suite & boundary checks
 │
 ├── services/
-│   └── backend/               # Gateway Base Station Server (Node.js + Express + WebSocket)
+│   └── backend/               # Ingestion Base Station Server (Node.js + Express + WebSocket)
 │       ├── src/               # /api/mesh/sync ingestion, SQLite store, WSS broadcast
-│       ├── scripts/           # simulate_e2e.ts end-to-end telemetry harness
-│       ├── Dockerfile         # Multi-stage Node 20 Alpine container
-│       └── package.json
+│       └── Dockerfile         # Multi-stage Node 20 container
 │
 ├── docker-compose.yml         # One-click multi-container base station stack
 ├── LICENSE                    # MIT Open Source License
@@ -175,74 +230,66 @@ meshaid/
 
 ---
 
-## 6. Runbook & Deployment Instructions
+## 6. Quickstart: Build, Test & Deployment Runbook
 
-### Option A: One-Click Base Station (Docker Compose)
+### A. Web Operations Dashboard (`apps/dashboard`)
 
-Deploy the complete base station (Backend API, SQLite telemetry store, WebSocket bridge, and Tactical Dashboard) with a single command:
+The dashboard is configured for direct deployment to **Cloudflare Pages** under project `meshaid-ops`.
 
+#### Local Development
 ```bash
-docker compose up --build -d
+# Navigate to dashboard workspace
+cd apps/dashboard
+
+# Install dependencies
+npm install
+
+# Start local development server (http://localhost:5173)
+npm run dev
 ```
 
-- **Tactical Command Dashboard:** [http://localhost](http://localhost) (or port `5173`)
-- **Backend REST API:** [http://localhost:3000](http://localhost:3000)
-- **WebSocket Ingestion Stream:** `ws://localhost:3000`
-- **Healthcheck Verification:**
-  ```bash
-  curl http://localhost:3000/api/health
-  # Expected: {"status":"healthy","uptime":...}
-  ```
+#### Production Build & Cloudflare Pages Deployment
+```bash
+# Compile TypeScript and bundle production static assets into dist/
+npm run build
+
+# Direct deployment to Cloudflare Pages via Wrangler
+npx wrangler pages deploy dist --project-name meshaid-ops
+
+# Or execute via dashboard package script
+npm run deploy:pages
+```
+
+Production deployment URL: **[https://meshaid-ops.pages.dev](https://meshaid-ops.pages.dev)**
 
 ---
 
-### Option B: Multi-Workspace Manual Development
+### B. Native Android Mobile Application (`apps/mobile`)
 
-#### 1. Protocol Package (Validation & Testing)
+#### Prerequisites
+- JDK 17 (Eclipse Temurin or OpenJDK)
+- Android SDK with Platform 34 and Build-Tools 34.0.0
+- Physical Android test handset (Android 12+, API 31+) with BLE 5.0 support
+
+#### Compile Debug APK
 ```bash
-cd packages/protocol
-npm install
-npm test
-npm run build
-```
-
-#### 2. Services Backend (Gateway & Ingestion)
-```bash
-cd services/backend
-npm install
-npm run build
-npm start
-
-# In a separate shell, execute the authentic End-to-End wire simulation:
-npm run test:e2e
-```
-
-#### 3. Apps Dashboard (Tactical C2 Console)
-```bash
-cd apps/dashboard
-npm install
-npm run dev
-# Dashboard launches at http://localhost:5173
-```
-
-#### 4. Native Android Mobile Application
-```bash
+# Navigate to mobile project directory
 cd apps/mobile
-# Compile Debug APK via Gradle wrapper
+
+# Build debug APK via Gradle wrapper
+# Windows:
 .\gradlew.bat assembleDebug
 
-# Output APK path:
+# Linux / macOS:
+./gradlew assembleDebug
+
+# Output APK location:
 # apps/mobile/app/build/outputs/apk/debug/app-debug.apk
 ```
 
----
-
-### Android Sideloading & Permission Grants
-
-Deploy the mobile mesh node to a physical test device via ADB:
-
+#### Sideloading & ADB Permission Grants
 ```bash
-# Sideload the compiled APK
+# Sideload the APK to a connected Android handset
 adb install -r apps/mobile/app/build/outputs/apk/debug/app-debug.apk
 
 # Grant required runtime permissions for BLE Advertising, Scanning, and GPS
@@ -259,33 +306,57 @@ adb shell dumpsys deviceidle whitelist +dev.meshaid.app
 
 ---
 
-## 7. Research Gap & Real-World Failure Boundaries Matrix
+### C. Protocol Package & Ingestion Backend
 
-| Evaluation Dimension | **MeshAid** (This Project) | **Meshtastic** | **Briar / Bridgefy** |
-| :--- | :--- | :--- | :--- |
-| **Physical RF Layer** | Standard 2.4 GHz BLE (COTS Smartphone) | Sub-GHz LoRa (433 / 868 / 915 MHz) | Wi-Fi Direct / Hybrid BLE |
-| **Hardware Prerequisite** | **Zero External Hardware** (Standard Handset) | Requires ESP32/nRF52 + SX1262 Radio Module | Zero External Hardware (Standard Handset) |
-| **Transmission Range** | **10 – 40 meters** per direct hop | **2 – 15+ kilometers** line-of-sight | **10 – 60 meters** |
-| **Data Throughput** | ~1 – 2 Mbps (Burst Advertising) | ~0.1 – 5 kbps (Extremely Narrowband) | ~2 – 50 Mbps (Wi-Fi P2P Group) |
-| **Routing Paradigm** | Store-Carry-Forward (DTN) | Flood / Managed Mesh (Synchronous) | Epidemic DTN / Wi-Fi Cluster |
-| **Cryptographic Model** | Ed25519 Source-Signed + SHA-256 ID | Pre-shared AES-256 / Ed25519 | TLS over P2P / Tor Onion Routing |
-| **Victim Adoption Barrier** | **Extremely Low** (Install APK on existing phone) | **High** (Requires pre-purchased hardware) | **Low** (Install app prior to disaster) |
+```bash
+# 1. Validate Protocol Wire Codec Tests
+cd packages/protocol
+npm install
+npm test
+
+# 2. Launch Ingestion Gateway Server
+cd ../../services/backend
+npm install
+npm run build
+npm start
+
+# 3. Execute End-to-End Synthetic Telemetry Harness
+npm run test:e2e
+```
 
 ---
 
-### Candid Real-World Limitations
+### D. One-Click Base Station (Docker Compose)
 
-1. **RF Propagation & Physical Attenuation:**
-   Standard 2.4 GHz Bluetooth Low Energy signals attenuate rapidly through reinforced concrete, rubble, soil, and dense foliage, limiting realistic transmission ranges to 10–25 meters indoors and up to 40 meters outdoors. MeshAid relies directly on **physical human mobility** (data mules walking or driving between sectors) rather than multi-kilometer wireless links.
+Deploy the entire base station stack (Ingestion API, SQLite database, WebSocket server, and Tactical C2 Console) locally:
 
-2. **Primary Channel Congestion (Channels 37, 38, 39):**
-   Legacy BLE advertising packets are broadcast across three uncoordinated 2 MHz channels without carrier-sense multiple access with collision avoidance (CSMA/CA) backoff mechanisms. High device densities ($>50$ broadcasting nodes in a tight perimeter) induce elevated packet collision rates, necessitating randomized transmission jitter and extended advertising intervals.
+```bash
+docker compose up --build -d
+```
+- **Operations Console:** [http://localhost](http://localhost) (or port `5173`)
+- **Backend API:** [http://localhost:3000](http://localhost:3000)
+- **Healthcheck Endpoint:** `curl http://localhost:3000/api/health`
 
-3. **OEM Aggressive Background Task Termination:**
-   Despite configuring Foreground Services and requesting battery optimization exemptions, customized Android vendor skins (e.g., Xiaomi MIUI/HyperOS, Samsung OneUI, Huawei EMUI) enforce proprietary background task killers that can suspend BLE scanning intervals after prolonged screen-off periods. Devices must be configured via vendor settings to allow unconstrained background execution.
+---
+
+## 7. Operational Boundaries & Physical Realities
+
+| Dimension | MeshAid (This Architecture) | Meshtastic | Bridgefy / Briar |
+| :--- | :--- | :--- | :--- |
+| **Physical RF Layer** | Standard 2.4 GHz BLE 5.0 (COTS Handsets) | Sub-GHz LoRa (433 / 868 / 915 MHz) | Wi-Fi Direct / Hybrid BLE |
+| **Hardware Barrier** | **Zero External Hardware** (Standard Smartphone) | High (Requires dedicated ESP32 + SX1262) | Zero External Hardware |
+| **Single-Hop Range** | **10 – 40 meters** line-of-sight | **2 – 15+ kilometers** line-of-sight | **10 – 60 meters** |
+| **Routing Model** | **Store-Carry-Forward DTN** (Human Mobility) | Flood Routing / Managed Mesh | Epidemic Routing / Wi-Fi Clusters |
+| **Cryptography** | **Source-Signed Ed25519** + SHA-256 Frame IDs | Pre-Shared AES-256 / Ed25519 | Tor Onion / TLS P2P |
+| **Mass Civilian Usability** | **Immediate** (Instantly installable APK) | Low (Requires pre-provisioned transceivers) | Medium (Pre-installed app required) |
+
+### Engineering Considerations & Failure Mitigations
+1. **RF Absorption in Structural Debris:** 2.4 GHz BLE signals experience severe attenuation through reinforced concrete, wet soil, and masonry rubble. MeshAid does not assume continuous direct radio links across kilometers; it relies on **physical movement of human carriers** carrying cached records across barrier zones.
+2. **Advertising Channel Contention:** High density of broadcasting nodes on BLE primary advertising channels (37, 38, 39) can cause packet collisions. MeshAid implements randomized transmission jitter (300ms - 800ms) and utilizes secondary advertising channels (`PHY_LE_1M` / `PHY_LE_CODED`) on supported BLE 5.0 chipsets.
+3. **Aggressive OEM Task Management:** Customized Android skins (Samsung OneUI, Xiaomi HyperOS) enforce strict background thread throttles. MeshAid counters this via Foreground Services, partial CPU `WakeLock` allocation during active scan cycles, and explicit system battery optimization whitelisting.
 
 ---
 
 ## 8. License
 
-This project is licensed under the terms of the **MIT License**. See [LICENSE](LICENSE) for complete details.
+This project is licensed under the terms of the **MIT License**. See [LICENSE](LICENSE) for full legal text.

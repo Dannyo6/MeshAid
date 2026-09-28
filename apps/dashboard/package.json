@@ -9,7 +9,9 @@
     "build": "tsc && vite build",
     "preview": "vite preview",
     "lint": "tsc --noEmit",
-    "deploy:cloud": "vercel --prod"
+    "deploy": "wrangler pages deploy dist --project-name meshaid-ops",
+    "deploy:pages": "wrangler pages deploy dist --project-name meshaid-ops",
+    "deploy:cloud": "wrangler pages deploy dist --project-name meshaid-ops"
   },
   "dependencies": {
     "framer-motion": "^13.4.4",
@@ -25,7 +27,8 @@
     "@types/react-dom": "^18.3.0",
     "@vitejs/plugin-react": "^4.3.0",
     "typescript": "^5.7.2",
-    "vite": "^5.2.11"
+    "vite": "^5.2.11",
+    "wrangler": "^3.114.0"
   },
   "author": "Dhanush V",
   "license": "MIT"
